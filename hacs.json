@@ -1,0 +1,6 @@
+{
+  "name": "LU-Alert",
+  "render_readme": true,
+  "country": "LU",
+  "domains": ["sensor"]
+}
