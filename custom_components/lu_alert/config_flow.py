@@ -1,13 +1,9 @@
 """Config flow for LU-Alert (Luxembourg) integration."""
-import logging
+from __future__ import annotations
 
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
-import voluptuous as vol
 
 from .const import DOMAIN
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class LuAlertConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -22,16 +18,6 @@ class LuAlertConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
 
-        if user_input is not None:
-            # No data is actually collected from the user, so we just create the entry.
-            return self.async_create_entry(title="LU-Alert", data={})
-
-        # Show the form to the user. Since there are no fields, it will just be
-        # a confirmation dialog.
-        return self.async_show_form(step_id="user")
-
-async def _async_has_devices(hass: HomeAssistant) -> bool:
-    """Return if there are devices that can be discovered."""
-    # This integration does not discover devices, it's a cloud service.
-    # Returning True allows the user to initiate the flow from the UI.
-    return True
+        # For a simple, no-input flow, we just create the entry directly
+        # without showing a form.
+        return self.async_create_entry(title="LU-Alert", data={})
