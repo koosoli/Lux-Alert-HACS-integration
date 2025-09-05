@@ -1,111 +1,59 @@
-# LU-Alert CAP-LU Python Integration
+# LU-Alert (Luxembourg) Integration for Home Assistant
 
-Dieses Projekt bietet eine Python-Bibliothek und ein Integrations-Skript zum Abrufen und Parsen von Warnmeldungen des luxemburgischen [LU-Alert-Systems](https://data.public.lu/fr/datasets/alertes-du-systeme-lu-alert/), die im CAP-LU-Format (Common Alerting Protocol) veröffentlicht werden.
+This is a custom integration for Home Assistant that provides alerts from the official Luxembourg government's [LU-Alert](https://www.lu-alert.lu/) system.
 
-Das Ziel ist es, eine robuste Alternative zu YAML-basierten Konfigurationen für Systeme wie Home Assistant bereitzustellen.
+It fetches data from the public data portal ([data.public.lu](https://data.public.lu/fr/datasets/alertes-du-systeme-lu-alert/)) and presents the latest alert information as a series of sensors in Home Assistant. This allows you to build automations based on official government warnings, such as public safety alerts, weather warnings, or other important announcements.
 
-## Projektstruktur
+## Features
 
-Das Projekt ist in zwei Hauptteile gegliedert: eine Kernbibliothek (`cap_lu`) und ein ausführbares Integrations-Skript (`integration.py`).
+- **UI-Based Configuration**: No YAML required. Add and configure the integration directly from the Home Assistant UI.
+- **Device Representation**: Creates a single "LU-Alert" device in Home Assistant, which groups all related sensors for a clean and organized experience.
+- **Efficient Polling**: Uses a `DataUpdateCoordinator` to fetch data from the source API efficiently, ensuring all sensors are updated from a single, shared data source.
+- **Dedicated Sensors**: Provides individual sensors for each piece of alert data (headline, description, severity, etc.), making them easy to use in automations and dashboards.
 
-### `cap_lu` Bibliothek
+## Installation
 
-Dies ist eine wiederverwendbare Bibliothek zur Verarbeitung von CAP-LU-Daten.
+### Via HACS (Home Assistant Community Store) - Recommended
 
-- **`models.py`**: Enthält Python-`dataclasses` (`Alert`, `Info`, `Area`, `Parameter`), die die Struktur einer CAP-Warnung abbilden.
-- **`enums.py`**: Definiert alle in der CAP-LU-Spezifikation festgelegten Enumerationen (z.B. `Status`, `MsgType`, `Severity`).
-- **`parser.py`**: Stellt die Funktion `parse_xml` bereit, die eine rohe XML-Zeichenkette in ein `Alert`-Objekt umwandelt.
-- **`builder.py`**: Stellt die Funktion `build_xml` bereit, um ein `Alert`-Objekt zurück in eine XML-Zeichenkette zu serialisieren.
-- **`validator.py`**: Enthält Geschäftslogik zur Validierung eines `Alert`-Objekts gegen die CAP-LU-Spezifikation (optional, nicht im Hauptskript verwendet).
+1.  Ensure you have [HACS](https://hacs.xyz/) installed.
+2.  Go to HACS > Integrations > and click the three dots in the top right.
+3.  Select "Custom repositories" and add the URL for this repository.
+4.  Select "Integration" as the category and click "Add".
+5.  The "LU-Alert" integration will now be available in HACS. Click "Install".
+6.  Restart Home Assistant.
 
-### `integration.py` Skript
+### Manual Installation
 
-Dieses Skript ist der Einstiegspunkt für die Integration. Es führt die folgenden Aktionen aus:
-1.  Kontaktiert die `data.public.lu` API, um die URL der neuesten XML-Warnungsdatei zu finden.
-2.  Ruft den Inhalt dieser URL ab.
-3.  Verwendet die `cap_lu`-Bibliothek, um den XML-Inhalt zu parsen.
-4.  Gibt die relevanten Warnungsinformationen als einzelnes JSON-Objekt auf der Standardausgabe aus.
+1.  Download the latest release from the [Releases](https://github.com/your-github-username/your-repo-name/releases) page.
+2.  Copy the `lu_alert` directory from the `custom_components` folder in the downloaded zip file.
+3.  Paste the `lu_alert` directory into the `custom_components` folder of your Home Assistant configuration directory.
+4.  Restart Home Assistant.
 
-## Einrichtung
+## Configuration
 
-1.  **Abhängigkeiten installieren:**
-    Stellen Sie sicher, dass Sie Python 3 installiert haben. Führen Sie dann den folgenden Befehl aus, um die erforderliche `requests`-Bibliothek zu installieren:
-    ```bash
-    pip install -r requirements.txt
-    ```
+1.  In Home Assistant, go to **Settings** > **Devices & Services**.
+2.  Click the **+ ADD INTEGRATION** button in the bottom right.
+3.  Search for **"LU-Alert"** and click on it.
+4.  Follow the on-screen instructions to complete the setup.
 
-2.  **Skript ausführen:**
-    Um die neueste Warnung abzurufen und die Sensor-Daten im JSON-Format auszugeben, führen Sie das Skript aus:
-    ```bash
-    python3 integration.py
-    ```
+The integration will be added, and you will find a new LU-Alert device with all its associated sensors ready to be used.
 
-## Beispiel-Ausgaben
+## Sensors
 
-Die Ausgabe des Skripts ist so gestaltet, dass sie direkt von anderen Systemen, wie z.B. einem Home Assistant `command_line`-Sensor, verarbeitet werden kann.
+The integration will create the following sensors:
 
-### Beispiel bei einer aktiven Warnung
+- **Headline**: The main title of the alert.
+- **Status**: The operational status of the alert (e.g., "Actual", "Test").
+- **Message Type**: The type of message (e.g., "Alert", "Update").
+- **Description**: A detailed description of the alert, often containing HTML.
+- **Sender**: The agency that sent the alert.
+- **Severity**: The severity level of the alert (e.g., "Severe", "Moderate").
+- **Certainty**: The certainty level of the alert (e.g., "Observed", "Likely").
+- **Urgency**: The urgency level of the alert (e.g., "Immediate", "Expected").
+- **Event**: The category of the event (e.g., "Avertissement alimentaire").
+- **Instruction**: Recommended actions to take.
+- **Sent Time**: The timestamp when the alert was sent.
+- **Expires Time**: The timestamp when the alert is expected to expire.
+- **Web**: A URL for more information.
 
-```json
-{
-    "LU-Alert Status": "Actual",
-    "LU-Alert Type": "Alert",
-    "LU-Alert Certainty": "Observed",
-    "LU-Alert Urgency": "Immediate",
-    "LU-Alert Severity": "Severe",
-    "LU-Alert Event": "Test Event",
-    "LU-Alert Headline": "Test Alert Headline",
-    "LU-Alert Description": "This is a test description.",
-    "LU-Alert Sender": "ctie@etat.lu",
-    "LU-Alert Sent": "2025-07-18T14:00:00+02:00",
-    "LU-Alert Identifier": "LU-Alert.1721304000.4000.0"
-}
-```
-
-### Beispiel, wenn keine Warnung aktiv ist
-
-Wenn keine aktive Warnung gefunden wird, gibt das Skript einen Standard-Satz von Werten aus, der einen "alles in Ordnung"-Zustand anzeigt:
-
-```json
-{
-    "LU-Alert Status": "OK",
-    "LU-Alert Type": "Keine",
-    "LU-Alert Certainty": "N/A",
-    "LU-Alert Urgency": "N/A",
-    "LU-Alert Severity": "N/A",
-    "LU-Alert Event": "Keine Warnung",
-    "LU-Alert Headline": "Keine Warnung",
-    "LU-Alert Description": "Derzeit liegt keine aktive Warnung vor.",
-    "LU-Alert Sender": "N/A",
-    "LU-Alert Sent": "N/A",
-    "LU-Alert Identifier": "N/A"
-}
-```
-
-## Konzeptuelle Home Assistant Integration
-
-Sie können dieses Skript in Home Assistant mit einem [Command-line Sensor](https://www.home-assistant.io/integrations/command_line/) integrieren. Der Sensor würde das Skript in regelmäßigen Abständen ausführen und das zurückgegebene JSON parsen.
-
-Hier ist eine konzeptionelle YAML-Konfiguration:
-
-```yaml
-sensor:
-  - platform: command_line
-    name: LU-Alert Data
-    command: "python3 /pfad/zu/ihrem/projekt/integration.py"
-    scan_interval: 300 # Alle 5 Minuten
-    value_template: "{{ value_json['LU-Alert Status'] }}" # Haupt-Sensor zeigt den Status an
-    json_attributes:
-      - "LU-Alert Type"
-      - "LU-Alert Certainty"
-      - "LU-Alert Urgency"
-      - "LU-Alert Severity"
-      - "LU-Alert Event"
-      - "LU-Alert Headline"
-      - "LU-Alert Description"
-      - "LU-Alert Sender"
-      - "LU-Alert Sent"
-      - "LU-Alert Identifier"
-```
-
-Von diesem Hauptsensor aus können Sie dann Template-Sensoren erstellen, um auf die einzelnen Attribute zuzugreifen, falls erforderlich.
+When no alert is active, the sensors will report a default "clear" state (e.g., "No active alert").

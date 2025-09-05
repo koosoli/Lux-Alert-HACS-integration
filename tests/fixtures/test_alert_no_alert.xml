@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<alerts>
-  <!-- This file intentionally contains no <alert> elements. -->
-  <!-- It is used to test the parser's behavior with an empty but valid feed. -->
-</alerts>

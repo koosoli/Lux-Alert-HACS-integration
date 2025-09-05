@@ -1,0 +1,12 @@
+{
+  "domain": "lu_alert",
+  "name": "LU-Alert (Luxembourg)",
+  "documentation": "https://github.com/YOUR_USERNAME/YOUR_REPOSITORY",
+  "issue_tracker": "https://github.com/YOUR_USERNAME/YOUR_REPOSITORY/issues",
+  "codeowners": ["@YOUR_USERNAME"],
+  "version": "1.0.0",
+  "iot_class": "cloud_polling",
+  "config_flow": true,
+  "dependencies": [],
+  "requirements": ["aiohttp"]
+}
