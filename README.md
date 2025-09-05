@@ -8,8 +8,9 @@ This integration is designed to handle multiple simultaneous alerts and allows y
 
 ## Features
 
-- **Single, Cohesive Sensor**: Provides one sensor, `sensor.lu_alert`, whose state is the number of active alerts. All alert data is stored in a list in the `alerts` attribute.
-- **Handles Multiple Alerts**: Correctly parses and displays all active alerts from the feed, not just the first one.
+- **Single, Cohesive Sensor**: The state of the main sensor shows the headline of the most important alert, making it immediately useful.
+- **Rich Attributes**: A full list of all active alerts (that meet your filter) is stored in the `alerts` attribute, perfect for detailed views and automations.
+- **Handles Multiple Alerts**: Correctly parses and displays all active alerts from the feed.
 - **Configurable Severity Filtering**: A dropdown menu in the configuration allows you to select the minimum severity of alerts you want to see (e.g., "Moderate" and above).
 - **UI-Based Configuration**: No YAML required. Add and configure the integration directly from the Home Assistant UI.
 - **Efficient Polling**: Uses a `DataUpdateCoordinator` to fetch data from the source API efficiently.
@@ -41,10 +42,12 @@ This integration is designed to handle multiple simultaneous alerts and allows y
 
 ## Using the Sensor
 
-The integration creates one sensor: `sensor.lu_alert`.
+The integration creates one primary sensor: `sensor.lu_alert`.
 
--   **State**: The number of active alerts that meet your minimum severity criteria.
--   **Attributes**: A list named `alerts` contains the detailed information for each active alert.
+-   **State**: The headline of the most important active alert (or "No active alerts").
+-   **Attributes**:
+    -   `alert_count`: The number of active alerts that meet your criteria.
+    -   `alerts`: A list containing the detailed information for each of those active alerts.
 
 ### Example Template for Lovelace
 

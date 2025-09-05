@@ -23,7 +23,7 @@ async def async_setup_entry(
 
 
 class LuAlertSensor(CoordinatorEntity[LuAlertDataUpdateCoordinator], SensorEntity):
-    """A sensor to display the number of active LU-Alerts."""
+    """A sensor to display the primary LU-Alert headline."""
 
     def __init__(
         self, coordinator: LuAlertDataUpdateCoordinator, entry: ConfigEntry
@@ -43,18 +43,21 @@ class LuAlertSensor(CoordinatorEntity[LuAlertDataUpdateCoordinator], SensorEntit
         }
 
     @property
-    def native_value(self) -> int:
-        """Return the state of the sensor (the number of active alerts)."""
+    def native_value(self) -> str:
+        """Return the state of the sensor (the headline of the most important alert)."""
         if self.coordinator.data:
-            return self.coordinator.data.get("count", 0)
-        return 0
+            return self.coordinator.data.get("headline", "No active alerts")
+        return "No active alerts"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the attributes of the sensor."""
         if self.coordinator.data:
-            return {"alerts": self.coordinator.data.get("alerts", [])}
-        return {"alerts": []}
+            return {
+                "alert_count": self.coordinator.data.get("count", 0),
+                "alerts": self.coordinator.data.get("alerts", []),
+            }
+        return {"alert_count": 0, "alerts": []}
 
     @property
     def available(self) -> bool:

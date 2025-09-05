@@ -1,8 +1,7 @@
 """DataUpdateCoordinator for the LU-Alert integration."""
 from __future__ import annotations
-
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 import asyncio
 
 import async_timeout
@@ -73,22 +72,24 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception as err:
             raise UpdateFailed(f"Failed to parse alert XML: {err}") from err
 
-        filtered_alerts = []
+        processed_alerts = []
         for alert in all_alerts:
             if not alert.info:
                 continue
 
-            # Get the severity level of the alert's first info block
-            # Default to 0 if severity is not set.
-            alert_severity_str = alert.info[0].severity.value if alert.info[0].severity else Severity.UNKNOWN.value
+            # This is the fix for the bug. We safely get the severity enum,
+            # then its value, providing a default at each step.
+            severity_enum = alert.info[0].severity
+            alert_severity_str = severity_enum.value if severity_enum else Severity.UNKNOWN.value
             alert_severity_level = SEVERITY_ORDER.get(alert_severity_str, 0)
 
             # Filter based on the user's configuration
             if alert_severity_level >= self.min_severity_level:
-                # Find the English info block, otherwise fall back to the first one.
                 info = next((i for i in alert.info if i.language and i.language.lower().startswith("en")), alert.info[0])
 
-                filtered_alerts.append({
+                processed_alerts.append({
+                    "severity_level": alert_severity_level,
+                    "sent_time": alert.sent or datetime.min,
                     "status": alert.status.value if alert.status else "Not Provided",
                     "msgType": alert.msgType.value if alert.msgType else "Not Provided",
                     "event": info.event or "Not Provided",
@@ -97,7 +98,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                     "instruction": info.instruction or "Not Provided",
                     "senderName": info.senderName or "Not Provided",
                     "certainty": info.certainty.value if info.certainty else "Not Provided",
-                    "severity": info.severity.value if info.severity else "Not Provided",
+                    "severity": alert_severity_str,
                     "urgency": info.urgency.value if info.urgency else "Not Provided",
                     "sent": alert.sent.isoformat() if alert.sent else "Not Provided",
                     "expires": info.expires.isoformat() if info.expires else "Not Provided",
@@ -105,9 +106,17 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                     "identifier": alert.identifier or "Not Provided",
                 })
 
+        # Sort alerts by severity (desc) and then by sent time (desc)
+        processed_alerts.sort(key=lambda x: (x["severity_level"], x["sent_time"]), reverse=True)
+
+        primary_headline = "No active alerts"
+        if processed_alerts:
+            primary_headline = processed_alerts[0]["headline"]
+
         return {
-            "count": len(filtered_alerts),
-            "alerts": filtered_alerts,
+            "headline": primary_headline,
+            "count": len(processed_alerts),
+            "alerts": processed_alerts,
         }
 
     async def _get_latest_alert_url(self) -> str | None:
@@ -141,4 +150,4 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
     def _get_default_state(self) -> dict:
         """Return a dictionary representing a clear/default state."""
-        return {"count": 0, "alerts": []}
+        return {"headline": "No active alerts", "count": 0, "alerts": []}
