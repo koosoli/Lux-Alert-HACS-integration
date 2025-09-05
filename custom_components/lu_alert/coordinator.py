@@ -58,20 +58,20 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             info = next((i for i in alert.info if i.language and i.language.lower().startswith("en")), alert.info[0])
 
             return {
-                "status": alert.status.value if alert.status else "N/A",
-                "msgType": alert.msgType.value if alert.msgType else "N/A",
-                "event": info.event,
-                "headline": info.headline,
-                "description": info.description,
-                "instruction": info.instruction,
-                "senderName": info.senderName,
-                "certainty": info.certainty.value if info.certainty else "N/A",
-                "severity": info.severity.value if info.severity else "N/A",
-                "urgency": info.urgency.value if info.urgency else "N/A",
-                "sent": alert.sent.isoformat() if alert.sent else "N/A",
-                "expires": info.expires.isoformat() if info.expires else "N/A",
-                "web": info.web,
-                "identifier": alert.identifier,
+                "status": alert.status.value if alert.status else "Not Provided",
+                "msgType": alert.msgType.value if alert.msgType else "Not Provided",
+                "event": info.event or "Not Provided",
+                "headline": info.headline or "Not Provided",
+                "description": info.description or "Not Provided",
+                "instruction": info.instruction or "Not Provided",
+                "senderName": info.senderName or "Not Provided",
+                "certainty": info.certainty.value if info.certainty else "Not Provided",
+                "severity": info.severity.value if info.severity else "Not Provided",
+                "urgency": info.urgency.value if info.urgency else "Not Provided",
+                "sent": alert.sent.isoformat() if alert.sent else "Not Provided",
+                "expires": info.expires.isoformat() if info.expires else "Not Provided",
+                "web": info.web or "Not Provided",
+                "identifier": alert.identifier or "Not Provided",
             }
 
         # If parsing succeeds but there's no alert or no info block, return a clear state.
