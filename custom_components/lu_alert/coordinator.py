@@ -54,7 +54,9 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(f"Failed to parse alert XML: {err}") from err
 
         if alert and alert.info:
-            info = alert.info[0]
+            # Find the English info block, otherwise fall back to the first one.
+            info = next((i for i in alert.info if i.language and i.language.lower().startswith("en")), alert.info[0])
+
             return {
                 "status": alert.status.value if alert.status else "N/A",
                 "msgType": alert.msgType.value if alert.msgType else "N/A",
