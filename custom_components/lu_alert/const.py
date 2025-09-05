@@ -18,3 +18,6 @@ CONF_MIN_SEVERITY = "min_severity"
 
 # Default values
 DEFAULT_MIN_SEVERITY = "Unknown"
+
+# Number of alert sensor sets to create
+MAX_ALERTS = 3

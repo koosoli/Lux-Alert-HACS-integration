@@ -2,16 +2,16 @@
 
 This is a custom integration for Home Assistant that provides alerts from the official Luxembourg government's [LU-Alert](https://www.lu-alert.lu/) system.
 
-It fetches data from the public data portal ([data.public.lu](https://data.public.lu/fr/datasets/alertes-du-systeme-lu-alert/)) and presents all active alerts in a single, cohesive sensor. This allows you to build powerful automations and dashboard views based on official government warnings.
+It fetches data from the public data portal ([data.public.lu](https://data.public.lu/fr/datasets/alertes-du-systeme-lu-alert/)) and presents the most important alerts as a fixed set of sensors. This allows you to build powerful automations and dashboard views based on official government warnings.
 
 This integration is designed to handle multiple simultaneous alerts and allows you to filter them by severity.
 
 ## Features
 
-- **Single, Cohesive Sensor**: The state of the main sensor shows the headline of the most important alert, making it immediately useful.
-- **Rich Attributes**: A full list of all active alerts (that meet your filter) is stored in the `alerts` attribute, perfect for detailed views and automations.
-- **Handles Multiple Alerts**: Correctly parses and displays all active alerts from the feed.
-- **Configurable Severity Filtering**: A dropdown menu in the configuration allows you to select the minimum severity of alerts you want to see (e.g., "Moderate" and above).
+- **Fixed Sensor Sets**: Creates a dedicated set of sensors for each of the top 3 most important alerts (e.g., `sensor.lu_alert_1_headline`, `sensor.lu_alert_2_headline`).
+- **Grouped Devices**: The sensors for each alert are grouped into a dedicated device in Home Assistant (e.g., "LU-Alert 1", "LU-Alert 2"), keeping your entity list clean and organized.
+- **Handles Multiple Alerts**: Correctly parses and displays the most important alerts from the feed, sorted by severity and date.
+- **Configurable Severity Filtering**: A dropdown menu in the configuration allows you to select the minimum severity of alerts you want the integration to consider.
 - **UI-Based Configuration**: No YAML required. Add and configure the integration directly from the Home Assistant UI.
 - **Efficient Polling**: Uses a `DataUpdateCoordinator` to fetch data from the source API efficiently.
 
@@ -40,42 +40,47 @@ This integration is designed to handle multiple simultaneous alerts and allows y
 4.  You will be prompted to select a **minimum severity level**. Alerts below this level will be ignored. Select your desired level and click **Submit**.
 5.  To change the severity level later, go to the integration's card on the Devices & Services page and click **"Configure"**.
 
-## Using the Sensor
+## Using the Sensors
 
-The integration creates one primary sensor: `sensor.lu_alert`.
+The integration creates up to 3 devices, one for each of the most important alerts found in the feed. Each device contains a set of sensors, for example:
 
--   **State**: The headline of the most important active alert (or "No active alerts").
--   **Attributes**:
-    -   `alert_count`: The number of active alerts that meet your criteria.
-    -   `alerts`: A list containing the detailed information for each of those active alerts.
+-   `sensor.lu_alert_1_headline`
+-   `sensor.lu_alert_1_severity`
+-   `sensor.lu_alert_1_description`
+-   `sensor.lu_alert_2_headline`
+-   etc.
 
-### Example Template for Lovelace
+If fewer than 3 alerts are active (that meet your severity filter), the remaining sets of sensors will have a state of "Not Active" or "No Alert".
 
-You can use a Markdown card with a template to display the alerts in a user-friendly way, similar to the official website.
+### Example Lovelace Card
+
+You can use an `entities` card or a custom `vertical-stack` with `conditional` cards to display the active alerts.
 
 ```yaml
-type: markdown
-content: |
-  {% set alerts = state_attr('sensor.lu_alert', 'alerts') %}
-  {% if alerts %}
-    {% for alert in alerts %}
-      ## {{ alert.headline }}
-      **Severity:** {{ alert.severity }} | **Status:** {{ alert.status }}
-
-      **Sent:** {{ as_timestamp(alert.sent) | timestamp_custom('%d %B %Y at %H:%M') }}
-
-      **Description:**
-      {{ alert.description }}
-
-      {% if alert.instruction %}
-      **Instruction:**
-      {{ alert.instruction }}
-      {% endif %}
-      ***
-    {% endfor %}
-  {% else %}
-    ## No Active Alerts
-    There are currently no active alerts meeting your criteria.
-  {% endif %}
-title: LU-Alert
+type: vertical-stack
+cards:
+  - type: conditional
+    conditions:
+      - entity: sensor.lu_alert_1_headline
+        state_not: "No Alert"
+    card:
+      type: entities
+      title: LU-Alert 1
+      entities:
+        - entity: sensor.lu_alert_1_headline
+        - entity: sensor.lu_alert_1_severity
+        - entity: sensor.lu_alert_1_status
+        - entity: sensor.lu_alert_1_description
+  - type: conditional
+    conditions:
+      - entity: sensor.lu_alert_2_headline
+        state_not: "No Alert"
+    card:
+      type: entities
+      title: LU-Alert 2
+      entities:
+        - entity: sensor.lu_alert_2_headline
+        - entity: sensor.lu_alert_2_severity
+        - entity: sensor.lu_alert_2_status
+        - entity: sensor.lu_alert_2_description
 ```
