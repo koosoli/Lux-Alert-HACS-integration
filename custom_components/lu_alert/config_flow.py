@@ -1,23 +1,82 @@
 """Config flow for LU-Alert (Luxembourg) integration."""
 from __future__ import annotations
+import logging
+from typing import Any
+
+import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.core import callback
+from homeassistant.data_entry_flow import FlowResult
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
+from .enums import Severity
 
+_LOGGER = logging.getLogger(__name__)
+
+# Define the list of severity levels for the dropdown, including a "None" option
+SEVERITY_LEVELS = [s.value for s in Severity]
 
 class LuAlertConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for LU-Alert."""
 
     VERSION = 1
 
-    async def async_step_user(self, user_input=None):
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
         """Handle the initial step."""
-        # This integration has only one instance possible, so if one is already
-        # configured, we will abort.
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
 
-        # For a simple, no-input flow, we just create the entry directly
-        # without showing a form.
-        return self.async_create_entry(title="LU-Alert", data={})
+        if user_input is not None:
+            return self.async_create_entry(title="LU-Alert", data=user_input)
+
+        # Define the form for the user to fill out
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_MIN_SEVERITY, default=DEFAULT_MIN_SEVERITY
+                ): vol.In(SEVERITY_LEVELS),
+            }
+        )
+
+        return self.async_show_form(step_id="user", data_schema=data_schema)
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> LuAlertOptionsFlowHandler:
+        """Get the options flow for this handler."""
+        return LuAlertOptionsFlowHandler(config_entry)
+
+
+class LuAlertOptionsFlowHandler(config_entries.OptionsFlow):
+    """Handle an options flow for LU-Alert."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            # Update the config entry with new options
+            return self.async_create_entry(title="", data=user_input)
+
+        # Define the form, pre-filling with existing options
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_MIN_SEVERITY,
+                    default=self.config_entry.options.get(
+                        CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
+                    ),
+                ): vol.In(SEVERITY_LEVELS),
+            }
+        )
+
+        return self.async_show_form(step_id="init", data_schema=data_schema)

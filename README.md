@@ -2,14 +2,17 @@
 
 This is a custom integration for Home Assistant that provides alerts from the official Luxembourg government's [LU-Alert](https://www.lu-alert.lu/) system.
 
-It fetches data from the public data portal ([data.public.lu](https://data.public.lu/fr/datasets/alertes-du-systeme-lu-alert/)) and presents the latest alert information as a series of sensors in Home Assistant. This allows you to build automations based on official government warnings, such as public safety alerts, weather warnings, or other important announcements.
+It fetches data from the public data portal ([data.public.lu](https://data.public.lu/fr/datasets/alertes-du-systeme-lu-alert/)) and presents all active alerts in a single, cohesive sensor. This allows you to build powerful automations and dashboard views based on official government warnings.
+
+This integration is designed to handle multiple simultaneous alerts and allows you to filter them by severity.
 
 ## Features
 
+- **Single, Cohesive Sensor**: Provides one sensor, `sensor.lu_alert`, whose state is the number of active alerts. All alert data is stored in a list in the `alerts` attribute.
+- **Handles Multiple Alerts**: Correctly parses and displays all active alerts from the feed, not just the first one.
+- **Configurable Severity Filtering**: A dropdown menu in the configuration allows you to select the minimum severity of alerts you want to see (e.g., "Moderate" and above).
 - **UI-Based Configuration**: No YAML required. Add and configure the integration directly from the Home Assistant UI.
-- **Device Representation**: Creates a single "LU-Alert" device in Home Assistant, which groups all related sensors for a clean and organized experience.
-- **Efficient Polling**: Uses a `DataUpdateCoordinator` to fetch data from the source API efficiently, ensuring all sensors are updated from a single, shared data source.
-- **Dedicated Sensors**: Provides individual sensors for each piece of alert data (headline, description, severity, etc.), making them easy to use in automations and dashboards.
+- **Efficient Polling**: Uses a `DataUpdateCoordinator` to fetch data from the source API efficiently.
 
 ## Installation
 
@@ -17,10 +20,9 @@ It fetches data from the public data portal ([data.public.lu](https://data.publi
 
 1.  Ensure you have [HACS](https://hacs.xyz/) installed.
 2.  Go to HACS > Integrations > and click the three dots in the top right.
-3.  Select "Custom repositories" and add the URL for this repository.
-4.  Select "Integration" as the category and click "Add".
-5.  The "LU-Alert" integration will now be available in HACS. Click "Install".
-6.  Restart Home Assistant.
+3.  Select "Custom repositories", add `https://github.com/koosoli/Lux-Alert-HACS-integration` as the repository URL, and select "Integration" as the category.
+4.  The "LU-Alert" integration will now be available in HACS. Click "Install".
+5.  Restart Home Assistant.
 
 ### Manual Installation
 
@@ -34,26 +36,43 @@ It fetches data from the public data portal ([data.public.lu](https://data.publi
 1.  In Home Assistant, go to **Settings** > **Devices & Services**.
 2.  Click the **+ ADD INTEGRATION** button in the bottom right.
 3.  Search for **"LU-Alert"** and click on it.
-4.  Follow the on-screen instructions to complete the setup.
+4.  You will be prompted to select a **minimum severity level**. Alerts below this level will be ignored. Select your desired level and click **Submit**.
+5.  To change the severity level later, go to the integration's card on the Devices & Services page and click **"Configure"**.
 
-The integration will be added, and you will find a new LU-Alert device with all its associated sensors ready to be used.
+## Using the Sensor
 
-## Sensors
+The integration creates one sensor: `sensor.lu_alert`.
 
-The integration will create the following sensors:
+-   **State**: The number of active alerts that meet your minimum severity criteria.
+-   **Attributes**: A list named `alerts` contains the detailed information for each active alert.
 
-- **Headline**: The main title of the alert.
-- **Status**: The operational status of the alert (e.g., "Actual", "Test").
-- **Message Type**: The type of message (e.g., "Alert", "Update").
-- **Description**: A detailed description of the alert, often containing HTML.
-- **Sender**: The agency that sent the alert.
-- **Severity**: The severity level of the alert (e.g., "Severe", "Moderate").
-- **Certainty**: The certainty level of the alert (e.g., "Observed", "Likely").
-- **Urgency**: The urgency level of the alert (e.g., "Immediate", "Expected").
-- **Event**: The category of the event (e.g., "Avertissement alimentaire").
-- **Instruction**: Recommended actions to take.
-- **Sent Time**: The timestamp when the alert was sent.
-- **Expires Time**: The timestamp when the alert is expected to expire.
-- **Web**: A URL for more information.
+### Example Template for Lovelace
 
-When no alert is active, the sensors will report a default "clear" state (e.g., "No active alert").
+You can use a Markdown card with a template to display the alerts in a user-friendly way, similar to the official website.
+
+```yaml
+type: markdown
+content: |
+  {% set alerts = state_attr('sensor.lu_alert', 'alerts') %}
+  {% if alerts %}
+    {% for alert in alerts %}
+      ## {{ alert.headline }}
+      **Severity:** {{ alert.severity }} | **Status:** {{ alert.status }}
+
+      **Sent:** {{ as_timestamp(alert.sent) | timestamp_custom('%d %B %Y at %H:%M') }}
+
+      **Description:**
+      {{ alert.description }}
+
+      {% if alert.instruction %}
+      **Instruction:**
+      {{ alert.instruction }}
+      {% endif %}
+      ***
+    {% endfor %}
+  {% else %}
+    ## No Active Alerts
+    There are currently no active alerts meeting your criteria.
+  {% endif %}
+title: LU-Alert
+```

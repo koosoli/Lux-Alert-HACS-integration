@@ -12,3 +12,9 @@ DEFAULT_NAME = "LU-Alert"
 # Default update interval for the coordinator.
 # 5 minutes is a reasonable default to avoid spamming the API.
 DEFAULT_SCAN_INTERVAL = 300  # seconds
+
+# Configuration keys
+CONF_MIN_SEVERITY = "min_severity"
+
+# Default values
+DEFAULT_MIN_SEVERITY = "Unknown"
