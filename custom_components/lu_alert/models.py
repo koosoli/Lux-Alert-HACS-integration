@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 from datetime import datetime
 
-from cap_lu.enums import (
+from .enums import (
     Status, MsgType, Scope, Code, Category, Urgency, Severity, Certainty
 )
 

@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DATASET_API_URL, DOMAIN, DEFAULT_SCAN_INTERVAL
-from .cap_lu.parser import parse_xml
+from .parser import parse_xml
 
 _LOGGER = logging.getLogger(__name__)
 
