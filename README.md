@@ -24,7 +24,7 @@ It fetches data from the public data portal ([data.public.lu](https://data.publi
 
 ### Manual Installation
 
-1.  Download the latest release from the [Releases](https://github.com/your-github-username/your-repo-name/releases) page.
+1.  Download the latest release from the [Releases](https://github.com/koosoli/Lux-Alert-HACS-integration/releases) page.
 2.  Copy the `lu_alert` directory from the `custom_components` folder in the downloaded zip file.
 3.  Paste the `lu_alert` directory into the `custom_components` folder of your Home Assistant configuration directory.
 4.  Restart Home Assistant.
