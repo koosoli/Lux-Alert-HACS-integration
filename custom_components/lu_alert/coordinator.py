@@ -22,7 +22,7 @@ from .const import (
     DEFAULT_MIN_SEVERITY,
 )
 from .parser import parse_xml
-from .enums import Severity
+from .enums import Severity, Category
 from .models import Info
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,9 +39,9 @@ SEVERITY_ORDER = {
 # Mapping from cb-lu-level parameter to Severity enum
 LEVEL_TO_SEVERITY = {
     "ALERT_LVL_1": Severity.MINOR,
-    "ALERT_LVL_2": Severity.MODERATE,
+    "ALERT_LVL_2": Severity.SEVERE,
     "LU-Alert Amber": Severity.MODERATE,
-    "ALERT_LVL_3": Severity.SEVERE,
+    "ALERT_LVL_3": Severity.MODERATE,
     "ALERT_LVL_4": Severity.EXTREME,
 }
 
@@ -78,7 +78,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         for xml_url in xml_urls:
             xml_content = await self._fetch_xml_content(xml_url)
             if not xml_content:
-                continue  # Skip to the next URL if content is empty
+                continue
 
             try:
                 alerts_from_file = await self.hass.async_add_executor_job(parse_xml, xml_content)
@@ -89,20 +89,27 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         if not all_alerts:
             return self._get_default_state()
 
-        processed_alerts = []
-        for alert in all_alerts:
-            if not alert.info:
-                continue
+        # Filter for relevant alert categories
+        allowed_categories = {
+            Category.GEO, Category.MET, Category.SAFETY, Category.SECURITY,
+            Category.RESCUE, Category.FIRE, Category.ENV, Category.TRANSPORT,
+            Category.INFRA
+        }
 
-            # This is the fix for the bug. We safely get the severity enum,
-            # then its value, providing a default at each step.
+        filtered_alerts = [
+            alert for alert in all_alerts
+            if alert.info and any(cat in allowed_categories for cat in alert.info[0].category)
+        ]
+
+        processed_alerts = []
+        for alert in filtered_alerts:
             severity_enum = self._get_severity(alert.info[0])
             alert_severity_str = severity_enum.value if severity_enum else Severity.UNKNOWN.value
             alert_severity_level = SEVERITY_ORDER.get(alert_severity_str, 0)
 
             # Filter based on the user's configuration
             if alert_severity_level >= self.min_severity_level:
-                info = next((i for i in alert.info if i.language and i.language.lower().startswith("en")), alert.info[0])
+                info = next((i for i in alert.info if i.language and i.language.lower().startswith("fr")), alert.info[0])
 
                 processed_alerts.append({
                     "severity_level": alert_severity_level,
@@ -161,7 +168,8 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                         response.raise_for_status()
                         data = await response.json()
                         if data and "resources" in data:
-                            for resource in data["resources"]:
+                            # Only process the most recent 20 files to avoid performance issues
+                            for resource in data["resources"][:20]:
                                 if resource.get("format", "").lower() == "xml":
                                     url = resource.get("url")
                                     if url:
