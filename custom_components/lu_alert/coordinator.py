@@ -103,14 +103,15 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
         processed_alerts = []
         for alert in filtered_alerts:
-            severity_enum = self._get_severity(alert.info[0])
+            # Prefer English language info, fall back to the first available
+            info = next((i for i in alert.info if i.language and i.language.lower().startswith("en")), alert.info[0])
+
+            severity_enum = self._get_severity(info)
             alert_severity_str = severity_enum.value if severity_enum else Severity.UNKNOWN.value
             alert_severity_level = SEVERITY_ORDER.get(alert_severity_str, 0)
 
             # Filter based on the user's configuration
             if alert_severity_level >= self.min_severity_level:
-                info = next((i for i in alert.info if i.language and i.language.lower().startswith("fr")), alert.info[0])
-
                 processed_alerts.append({
                     "severity_level": alert_severity_level,
                     "sent_time": alert.sent or datetime.min,
@@ -151,9 +152,9 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
         # If it's unknown, try to find it in the parameters.
         # Note: The official CAP-LU documentation specifies "cb-lu-level",
-        # but the actual XML feed uses "cb-eu-level".
+        # but the actual XML feed uses "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level".
         for param in info.parameters:
-            if param.valueName and "cb-eu-level" in param.valueName.lower():
+            if param.valueName == "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level":
                 return LEVEL_TO_SEVERITY.get(param.value, Severity.UNKNOWN)
 
         return Severity.UNKNOWN

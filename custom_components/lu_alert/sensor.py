@@ -1,5 +1,6 @@
 """Sensor platform for LU-Alert (Luxembourg)."""
 from __future__ import annotations
+import re
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
@@ -116,6 +117,10 @@ class LuAlertSeveritySensor(LuAlertIndexedSensor):
             return self.alert_data.get("severity")
         return "Not Active"
 
+def _strip_html(text: str) -> str:
+    """Remove HTML tags from a string."""
+    return re.sub('<[^<]+?>', '', text)
+
 class LuAlertDescriptionSensor(LuAlertIndexedSensor):
     """Sensor for the alert description."""
     _attr_icon = "mdi:text-box-outline"
@@ -128,6 +133,18 @@ class LuAlertDescriptionSensor(LuAlertIndexedSensor):
 
     @property
     def native_value(self) -> str | None:
+        """Return the state of the sensor (truncated, plain text)."""
         if self.alert_data:
-            return self.alert_data.get("description")
+            description = self.alert_data.get("description")
+            if description:
+                plain_text = _strip_html(description).strip()
+                return (plain_text[:252] + "...") if len(plain_text) > 252 else plain_text
+            return "Not Provided"
         return "Not Active"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return the full description as an attribute."""
+        if self.alert_data:
+            return {"full_description": self.alert_data.get("description")}
+        return None
