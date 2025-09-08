@@ -23,6 +23,7 @@ from .const import (
 )
 from .parser import parse_xml
 from .enums import Severity
+from .models import Info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,6 +34,15 @@ SEVERITY_ORDER = {
     Severity.MODERATE.value: 2,
     Severity.SEVERE.value: 3,
     Severity.EXTREME.value: 4,
+}
+
+# Mapping from cb-lu-level parameter to Severity enum
+LEVEL_TO_SEVERITY = {
+    "ALERT_LVL_1": Severity.MINOR,
+    "ALERT_LVL_2": Severity.MODERATE,
+    "LU-Alert Amber": Severity.MODERATE,
+    "ALERT_LVL_3": Severity.SEVERE,
+    "ALERT_LVL_4": Severity.EXTREME,
 }
 
 
@@ -86,7 +96,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
             # This is the fix for the bug. We safely get the severity enum,
             # then its value, providing a default at each step.
-            severity_enum = alert.info[0].severity
+            severity_enum = self._get_severity(alert.info[0])
             alert_severity_str = severity_enum.value if severity_enum else Severity.UNKNOWN.value
             alert_severity_level = SEVERITY_ORDER.get(alert_severity_str, 0)
 
@@ -125,6 +135,21 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             "count": len(processed_alerts),
             "alerts": processed_alerts,
         }
+
+    def _get_severity(self, info: Info) -> Severity:
+        """Determine the severity of an alert, checking parameters as a fallback."""
+        # First, try the direct severity field
+        if info.severity and info.severity != Severity.UNKNOWN:
+            return info.severity
+
+        # If it's unknown, try to find it in the parameters.
+        # Note: The official CAP-LU documentation specifies "cb-lu-level",
+        # but the actual XML feed uses "cb-eu-level".
+        for param in info.parameters:
+            if param.valueName and "cb-eu-level" in param.valueName.lower():
+                return LEVEL_TO_SEVERITY.get(param.value, Severity.UNKNOWN)
+
+        return Severity.UNKNOWN
 
     async def _get_all_alert_urls(self) -> list[str]:
         """Get the URLs of all alert XMLs from the dataset API."""
