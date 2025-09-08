@@ -59,18 +59,25 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> dict:
         """Fetch, process, and filter data from the LU-Alert feed."""
-        xml_url = await self._get_latest_alert_url()
-        if not xml_url:
-            raise UpdateFailed("Could not get latest alert XML URL from API.")
-
-        xml_content = await self._fetch_xml_content(xml_url)
-        if not xml_content:
+        xml_urls = await self._get_all_alert_urls()
+        if not xml_urls:
+            _LOGGER.info("No alert XML URLs found.")
             return self._get_default_state()
 
-        try:
-            all_alerts = await self.hass.async_add_executor_job(parse_xml, xml_content)
-        except Exception as err:
-            raise UpdateFailed(f"Failed to parse alert XML: {err}") from err
+        all_alerts = []
+        for xml_url in xml_urls:
+            xml_content = await self._fetch_xml_content(xml_url)
+            if not xml_content:
+                continue  # Skip to the next URL if content is empty
+
+            try:
+                alerts_from_file = await self.hass.async_add_executor_job(parse_xml, xml_content)
+                all_alerts.extend(alerts_from_file)
+            except Exception as err:
+                _LOGGER.warning(f"Failed to parse alert XML from {xml_url}: {err}")
+
+        if not all_alerts:
+            return self._get_default_state()
 
         processed_alerts = []
         for alert in all_alerts:
@@ -119,8 +126,9 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             "alerts": processed_alerts,
         }
 
-    async def _get_latest_alert_url(self) -> str | None:
-        """Get the URL of the latest alert XML from the dataset API."""
+    async def _get_all_alert_urls(self) -> list[str]:
+        """Get the URLs of all alert XMLs from the dataset API."""
+        urls = []
         try:
             async with async_timeout.timeout(10):
                 async with aiohttp.ClientSession() as session:
@@ -130,11 +138,13 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                         if data and "resources" in data:
                             for resource in data["resources"]:
                                 if resource.get("format", "").lower() == "xml":
-                                    return resource.get("url")
-            return None
+                                    url = resource.get("url")
+                                    if url:
+                                        urls.append(url)
+            return urls
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.warning("Failed to get latest alert URL: %s", err)
-            return None
+            _LOGGER.warning("Failed to get alert URLs: %s", err)
+            return []
 
     async def _fetch_xml_content(self, url: str) -> str | None:
         """Fetch the raw XML content from a given URL."""
