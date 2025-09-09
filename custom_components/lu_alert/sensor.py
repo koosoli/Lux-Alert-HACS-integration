@@ -70,6 +70,19 @@ class LuAlertIndexedSensor(CoordinatorEntity[LuAlertDataUpdateCoordinator], Sens
         """Return if the sensor is available."""
         return super().available and self.coordinator.data is not None
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return common attributes for all sensors."""
+        if self.alert_data:
+            return {
+                "headline": self.alert_data.get("headline"),
+                "event": self.alert_data.get("event"),
+                "sent": self.alert_data.get("sent"),
+                "expires": self.alert_data.get("expires"),
+            }
+        return None
+
+
 # --- Individual Sensor Classes ---
 
 class LuAlertHeadlineSensor(LuAlertIndexedSensor):
@@ -145,6 +158,7 @@ class LuAlertDescriptionSensor(LuAlertIndexedSensor):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return the full description as an attribute."""
+        attrs = super().extra_state_attributes or {}
         if self.alert_data:
-            return {"full_description": self.alert_data.get("description")}
-        return None
+            attrs["full_description"] = self.alert_data.get("description")
+        return attrs
