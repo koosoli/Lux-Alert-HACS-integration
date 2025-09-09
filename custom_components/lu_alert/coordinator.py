@@ -38,11 +38,17 @@ SEVERITY_ORDER = {
 
 # Mapping from cb-lu-level parameter to Severity enum
 LEVEL_TO_SEVERITY = {
+    # Official mapping from lu-alert.lu (N1=Red, N2=Orange, N3=Yellow)
+    "N1": Severity.EXTREME,
+    "N2": Severity.SEVERE,
+    "N3": Severity.MODERATE,
+
+    # Fallback for older or different formats observed in data
+    "ALERT_LVL_4": Severity.EXTREME,   # Red
+    "ALERT_LVL_3": Severity.SEVERE,    # Orange
+    "ALERT_LVL_2": Severity.MODERATE,  # Yellow
     "ALERT_LVL_1": Severity.MINOR,
-    "ALERT_LVL_2": Severity.SEVERE,
-    "LU-Alert Amber": Severity.MODERATE,
-    "ALERT_LVL_3": Severity.MODERATE,
-    "ALERT_LVL_4": Severity.EXTREME,
+    "LU-Alert Amber": Severity.MODERATE, # Specific for AMBER alerts
 }
 
 
