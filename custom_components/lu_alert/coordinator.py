@@ -92,10 +92,15 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
     @property
     def min_severity_level(self) -> int:
-        """Get the minimum severity level from config options."""
-        severity_str = self.config_entry.options.get(
-            CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
-        )
+        """Get the minimum severity level from config options or data."""
+        # First, try to get the severity from the options flow
+        severity_str = self.config_entry.options.get(CONF_MIN_SEVERITY)
+        if severity_str is None:
+            # If not in options, fall back to the initial config data
+            severity_str = self.config_entry.data.get(
+                CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
+            )
+
         return SEVERITY_ORDER.get(severity_str, 0)
 
     async def _async_update_data(self) -> dict:
