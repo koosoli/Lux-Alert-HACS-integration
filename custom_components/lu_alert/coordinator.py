@@ -143,7 +143,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         ]
 
         now = dt_util.utcnow()
-        fourteen_days_ago = now - timedelta(days=14)
+        fourteen_days_ago = now - timedelta(days=10)
         processed_alerts = []
         for alert in filtered_alerts:
             # Prefer English language info, fall back to the first available
