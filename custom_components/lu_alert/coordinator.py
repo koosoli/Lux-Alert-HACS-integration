@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DATASET_API_URL,
@@ -107,16 +108,22 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             if alert.info and any(cat in allowed_categories for cat in alert.info[0].category)
         ]
 
+        now = dt_util.utcnow()
         processed_alerts = []
         for alert in filtered_alerts:
             # Prefer English language info, fall back to the first available
             info = next((i for i in alert.info if i.language and i.language.lower().startswith("en")), alert.info[0])
 
+            # Filter out expired alerts
+            if info.expires and info.expires < now:
+                _LOGGER.debug(f"Filtering expired alert: {alert.identifier}")
+                continue
+
             severity_enum = self._get_severity(info)
             alert_severity_str = severity_enum.value if severity_enum else Severity.UNKNOWN.value
             alert_severity_level = SEVERITY_ORDER.get(alert_severity_str, 0)
 
-            # Filter based on the user's configuration
+            # Filter based on the user's configuration for minimum severity
             if alert_severity_level >= self.min_severity_level:
                 processed_alerts.append({
                     "severity_level": alert_severity_level,
