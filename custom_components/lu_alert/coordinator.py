@@ -44,7 +44,6 @@ LEVEL_TO_SEVERITY = {
     # Extreme (Red alerts, L1/N1)
     "N1": Severity.EXTREME,
     "L1": Severity.EXTREME,
-    "ALERT_LVL_4": Severity.EXTREME,
     "LU-Alert Level 4": Severity.EXTREME,
 
     # Severe (Orange alerts, L2/N2)
@@ -67,6 +66,7 @@ LEVEL_TO_SEVERITY = {
 
     # Informational (I)
     "I": Severity.INFORMATION,
+    "ALERT_LVL_4": Severity.INFORMATION,
 
     # Test (T, D)
     "T": Severity.TEST,
@@ -152,6 +152,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             if is_test_alert:
                 _LOGGER.debug(f"Filtering test alert: {alert.identifier}")
                 continue
+
 
             severity_enum = self._get_severity(info)
             alert_severity_str = severity_enum.value if severity_enum else Severity.UNKNOWN.value
