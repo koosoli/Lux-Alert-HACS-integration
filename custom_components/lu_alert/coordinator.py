@@ -46,14 +46,14 @@ LEVEL_TO_SEVERITY = {
     "L1": Severity.EXTREME,
     "ALERT_LVL_4": Severity.EXTREME,
     "LU-Alert Level 4": Severity.EXTREME,
-    "ALERT_LVL_1": Severity.EXTREME,
-    "LU-Alert Level 1": Severity.EXTREME,
 
     # Severe (Orange alerts, L2/N2)
     "N2": Severity.SEVERE,
     "L2": Severity.SEVERE,
     "ALERT_LVL_2": Severity.SEVERE,
     "LU-Alert Level 2": Severity.SEVERE,
+    "ALERT_LVL_1": Severity.SEVERE,
+    "LU-Alert Level 1": Severity.SEVERE,
 
     # Moderate (Amber alerts, A)
     "A": Severity.MODERATE,
@@ -74,7 +74,7 @@ LEVEL_TO_SEVERITY = {
 }
 
 # Set of alert levels that should be considered as "Test" and filtered out
-TEST_ALERT_LEVELS = {"LU-Alert Test", "LU-Alert Exercise"}
+TEST_ALERT_LEVELS = {"D", "T", "LU-Alert Test", "LU-Alert Exercise"}
 
 
 class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
