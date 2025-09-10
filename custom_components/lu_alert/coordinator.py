@@ -41,40 +41,42 @@ SEVERITY_ORDER = {
 
 # Mapping from cb-lu-level parameter to Severity enum
 LEVEL_TO_SEVERITY = {
-    # Extreme (Red alerts, L1/N1)
+    # Extreme
     "N1": Severity.EXTREME,
     "L1": Severity.EXTREME,
-    "LU-Alert Level 4": Severity.EXTREME,
+    "D": Severity.EXTREME,
+    "LU-Alert Level 1": Severity.EXTREME,
+    "ALERT_LVL_1": Severity.EXTREME,
 
-    # Severe (Orange alerts, L2/N2)
+    # Severe
     "N2": Severity.SEVERE,
     "L2": Severity.SEVERE,
-    "ALERT_LVL_2": Severity.SEVERE,
     "LU-Alert Level 2": Severity.SEVERE,
-    "ALERT_LVL_1": Severity.SEVERE,
-    "LU-Alert Level 1": Severity.SEVERE,
+    "ALERT_LVL_2": Severity.SEVERE,
 
-    # Moderate (Amber alerts, A)
+    # Moderate
     "A": Severity.MODERATE,
     "LU-Alert Amber": Severity.MODERATE,
 
-    # Minor (Yellow alerts, L3/N3)
+    # Minor
     "N3": Severity.MINOR,
     "L3": Severity.MINOR,
-    "ALERT_LVL_3": Severity.MINOR,
     "LU-Alert Level 3": Severity.MINOR,
+    "ALERT_LVL_3": Severity.MINOR,
 
-    # Informational (I)
+    # Information
     "I": Severity.INFORMATION,
+    "LU-Alert Level 4": Severity.INFORMATION,
     "ALERT_LVL_4": Severity.INFORMATION,
 
-    # Test (T, D)
+    # Test
     "T": Severity.TEST,
-    "D": Severity.TEST,
+    "LU-Alert Test": Severity.TEST,
+    "LU-Alert Exercise": Severity.TEST,
 }
 
 # Set of alert levels that should be considered as "Test" and filtered out
-TEST_ALERT_LEVELS = {"D", "T", "LU-Alert Test", "LU-Alert Exercise"}
+TEST_ALERT_LEVELS = {"T", "D", "LU-Alert Test", "LU-Alert Exercise"}
 
 
 class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
@@ -92,15 +94,10 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
     @property
     def min_severity_level(self) -> int:
-        """Get the minimum severity level from config options or data."""
-        # First, try to get the severity from the options flow
-        severity_str = self.config_entry.options.get(CONF_MIN_SEVERITY)
-        if severity_str is None:
-            # If not in options, fall back to the initial config data
-            severity_str = self.config_entry.data.get(
-                CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
-            )
-
+        """Get the minimum severity level from config options."""
+        severity_str = self.config_entry.options.get(
+            CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
+        )
         return SEVERITY_ORDER.get(severity_str, 0)
 
     async def _async_update_data(self) -> dict:
@@ -157,7 +154,6 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             if is_test_alert:
                 _LOGGER.debug(f"Filtering test alert: {alert.identifier}")
                 continue
-
 
             severity_enum = self._get_severity(info)
             alert_severity_str = severity_enum.value if severity_enum else Severity.UNKNOWN.value
