@@ -41,7 +41,7 @@ SEVERITY_ORDER = {
 LEVEL_TO_SEVERITY = {
     # Extreme (Red alerts)
     "N1": Severity.EXTREME,
-    "D": Severity.EXTREME,
+    "L1": Severity.EXTREME,
     "ALERT_LVL_4": Severity.EXTREME,
 
     # Severe (Orange alerts)
@@ -51,7 +51,6 @@ LEVEL_TO_SEVERITY = {
 
     # Minor (Yellow alerts and Health alerts, per user feedback)
     "N3": Severity.MINOR,
-    "L1": Severity.MINOR,
     "L3": Severity.MINOR,
     "ALERT_LVL_2": Severity.MINOR,
     "ALERT_LVL_1": Severity.MINOR,
@@ -125,6 +124,16 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             # Filter out expired alerts
             if info.expires and info.expires < now:
                 _LOGGER.debug(f"Filtering expired alert: {alert.identifier}")
+                continue
+
+            # Filter out test alerts based on the 'D' code, as requested by the user
+            is_test_alert = False
+            for param in info.parameters:
+                if param.valueName == "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level" and param.value == "D":
+                    is_test_alert = True
+                    break
+            if is_test_alert:
+                _LOGGER.debug(f"Filtering test alert (level 'D'): {alert.identifier}")
                 continue
 
             severity_enum = self._get_severity(info)
