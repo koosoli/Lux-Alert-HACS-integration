@@ -55,6 +55,8 @@ class Severity(Enum):
     SEVERE = "Severe"
     MODERATE = "Moderate"
     MINOR = "Minor"
+    INFORMATION = "Information"
+    TEST = "Test"
     UNKNOWN = "Unknown"
 
 class Certainty(Enum):
