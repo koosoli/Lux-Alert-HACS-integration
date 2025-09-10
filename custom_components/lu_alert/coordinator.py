@@ -39,25 +39,32 @@ SEVERITY_ORDER = {
 
 # Mapping from cb-lu-level parameter to Severity enum
 LEVEL_TO_SEVERITY = {
-    # Extreme (Red alerts)
+    # Extreme (Red alerts, L1)
     "N1": Severity.EXTREME,
     "L1": Severity.EXTREME,
     "ALERT_LVL_4": Severity.EXTREME,
+    "LU-Alert Level 4": Severity.EXTREME,
 
-    # Severe (Orange alerts)
+    # Severe (Orange alerts, L2)
     "N2": Severity.SEVERE,
     "L2": Severity.SEVERE,
+    "ALERT_LVL_2": Severity.SEVERE,
+    "LU-Alert Level 2": Severity.SEVERE,
 
-    # Minor (Yellow alerts and Health alerts, per user feedback)
+    # Minor (Yellow alerts, L3)
     "N3": Severity.MINOR,
     "L3": Severity.MINOR,
     "ALERT_LVL_3": Severity.MINOR,
-    "ALERT_LVL_2": Severity.MINOR,
+    "LU-Alert Level 3": Severity.MINOR,
     "ALERT_LVL_1": Severity.MINOR,
+    "LU-Alert Level 1": Severity.MINOR,
 
     # Moderate (Special case for Amber alerts)
     "LU-Alert Amber": Severity.MODERATE,
 }
+
+# Set of alert levels that should be considered as "Test" and filtered out
+TEST_ALERT_LEVELS = {"D", "T", "LU-Alert Test", "LU-Alert Exercise"}
 
 
 class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
@@ -124,6 +131,16 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             # Filter out expired alerts
             if info.expires and info.expires < now:
                 _LOGGER.debug(f"Filtering expired alert: {alert.identifier}")
+                continue
+
+            # Filter out test alerts
+            is_test_alert = False
+            for param in info.parameters:
+                if param.valueName == "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level" and param.value in TEST_ALERT_LEVELS:
+                    is_test_alert = True
+                    break
+            if is_test_alert:
+                _LOGGER.debug(f"Filtering test alert: {alert.identifier}")
                 continue
 
             severity_enum = self._get_severity(info)
