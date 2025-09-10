@@ -21,35 +21,29 @@ async def async_setup_entry(
     """Set up the LU-Alert sensors from a config entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Add the main summary and highest severity sensors
     sensors_to_add = [
         LuAlertMainSensor(coordinator, entry),
         LuAlertHighestSeveritySensor(coordinator, entry),
     ]
 
-    # Add the indexed sensors for easy dashboard display
     for i in range(MAX_ALERTS):
         sensors_to_add.append(LuAlertIndexedSensor(coordinator, entry, i))
 
     async_add_entities(sensors_to_add)
 
 
-class LuAlertMainSensor(CoordinatorEntity[LuAlertDataUpdateCoordinator], SensorEntity):
-    """The main LU-Alert sensor, showing the number of active alerts."""
+class LuAlertBaseSensor(CoordinatorEntity[LuAlertDataUpdateCoordinator], SensorEntity):
+    """Base class for LU-Alert sensors."""
 
     _attr_has_entity_name = True
-    _attr_icon = "mdi:alert-decagram"
 
     def __init__(
         self, coordinator: LuAlertDataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
-        """Initialize the main sensor."""
+        """Initialize the base sensor."""
         super().__init__(coordinator)
         self.entry = entry
         self._attr_attribution = "Data provided by data.public.lu"
-        self._attr_unique_id = f"{self.entry.entry_id}_main"
-        self._attr_name = DEFAULT_NAME
-
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.entry.entry_id)},
             name=DEFAULT_NAME,
@@ -59,17 +53,34 @@ class LuAlertMainSensor(CoordinatorEntity[LuAlertDataUpdateCoordinator], SensorE
         )
 
     @property
-    def native_value(self) -> int:
-        """Return the number of active alerts."""
-        if self.coordinator.data:
-            return self.coordinator.data.get("count", 0)
-        return 0
+    def available(self) -> bool:
+        """Return if the coordinator is available."""
+        return self.coordinator.last_update_success
+
+
+class LuAlertMainSensor(LuAlertBaseSensor):
+    """The main LU-Alert sensor, showing the number of active alerts."""
+
+    _attr_icon = "mdi:alert-decagram"
+
+    def __init__(
+        self, coordinator: LuAlertDataUpdateCoordinator, entry: ConfigEntry
+    ) -> None:
+        """Initialize the main sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{self.entry.entry_id}_main"
+        self._attr_name = DEFAULT_NAME
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
+    def native_value(self) -> int:
+        """Return the number of active alerts."""
+        return self.coordinator.data.get("count", 0) if self.coordinator.data else 0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return the state attributes, including the list of all alerts."""
         if not self.coordinator.data:
-            return None
+            return {}
 
         attrs = {}
         counts = self.coordinator.data.get("severity_counts", {})
@@ -90,35 +101,17 @@ class LuAlertMainSensor(CoordinatorEntity[LuAlertDataUpdateCoordinator], SensorE
         attrs["alerts"] = self.coordinator.data.get("alerts", [])
         return attrs
 
-    @property
-    def available(self) -> bool:
-        return super().available and self.coordinator.data is not None
 
-
-class LuAlertHighestSeveritySensor(
-    CoordinatorEntity[LuAlertDataUpdateCoordinator], SensorEntity
-):
+class LuAlertHighestSeveritySensor(LuAlertBaseSensor):
     """A sensor that shows the highest severity level currently active."""
-
-    _attr_has_entity_name = True
 
     def __init__(
         self, coordinator: LuAlertDataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the highest severity sensor."""
-        super().__init__(coordinator)
-        self.entry = entry
-        self._attr_attribution = "Data provided by data.public.lu"
+        super().__init__(coordinator, entry)
         self._attr_unique_id = f"{self.entry.entry_id}_highest_severity"
         self._attr_name = f"{DEFAULT_NAME} Highest Severity"
-
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.entry.entry_id)},
-            name=DEFAULT_NAME,
-            manufacturer="Luxembourg Government",
-            model="LU-Alert",
-            entry_type="service",
-        )
 
     @property
     def native_value(self) -> str:
@@ -128,46 +121,31 @@ class LuAlertHighestSeveritySensor(
         return "None"
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return attributes of the highest severity alert."""
         if self.coordinator.data and self.coordinator.data.get("highest_severity_alert"):
             return self.coordinator.data["highest_severity_alert"]
-        return None
-
-    @property
-    def available(self) -> bool:
-        return super().available and self.coordinator.data is not None
+        return {}
 
 
-class LuAlertIndexedSensor(CoordinatorEntity[LuAlertDataUpdateCoordinator], SensorEntity):
+class LuAlertIndexedSensor(LuAlertBaseSensor):
     """A sensor for a single alert, identified by its index."""
 
-    _attr_has_entity_name = True
     _attr_icon = "mdi:alert-outline"
 
     def __init__(
         self, coordinator: LuAlertDataUpdateCoordinator, entry: ConfigEntry, index: int
     ) -> None:
         """Initialize the indexed sensor."""
-        super().__init__(coordinator)
-        self.entry = entry
+        super().__init__(coordinator, entry)
         self.index = index
-        self._attr_attribution = "Data provided by data.public.lu"
         self._attr_unique_id = f"{self.entry.entry_id}_alert_{index + 1}"
         self._attr_name = f"Alert {index + 1}"
-
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.entry.entry_id)},
-            name=DEFAULT_NAME,
-            manufacturer="Luxembourg Government",
-            model="LU-Alert",
-            entry_type="service",
-        )
 
     @property
     def alert_data(self) -> dict[str, Any] | None:
         """Return the alert data for this sensor's index."""
-        if self.coordinator.data and len(self.coordinator.data["alerts"]) > self.index:
+        if self.coordinator.data and len(self.coordinator.data.get("alerts", [])) > self.index:
             return self.coordinator.data["alerts"][self.index]
         return None
 
@@ -179,16 +157,10 @@ class LuAlertIndexedSensor(CoordinatorEntity[LuAlertDataUpdateCoordinator], Sens
         return "No Alert"
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return the rest of the alert data as attributes."""
         if self.alert_data:
-            # Return all data for this alert, except the headline which is the state
             attrs = self.alert_data.copy()
             attrs.pop("headline", None)
             return attrs
-        return None
-
-    @property
-    def available(self) -> bool:
-        """Return if the sensor is available (i.e., if the alert exists)."""
-        return super().available and self.alert_data is not None
+        return {}
