@@ -166,17 +166,19 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         }
 
     def _get_severity(self, info: Info) -> Severity:
-        """Determine the severity of an alert, checking parameters as a fallback."""
-        # First, try the direct severity field
-        if info.severity and info.severity != Severity.UNKNOWN:
-            return info.severity
-
-        # If it's unknown, try to find it in the parameters.
+        """Determine the severity of an alert, prioritizing the parameter code."""
+        # First, try to find the specific LU-Alert level parameter, as it's the most reliable.
         # Note: The official CAP-LU documentation specifies "cb-lu-level",
         # but the actual XML feed uses "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level".
         for param in info.parameters:
             if param.valueName == "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level":
-                return LEVEL_TO_SEVERITY.get(param.value, Severity.UNKNOWN)
+                severity = LEVEL_TO_SEVERITY.get(param.value)
+                if severity:
+                    return severity
+
+        # If no specific parameter is found, fall back to the direct severity field.
+        if info.severity:
+            return info.severity
 
         return Severity.UNKNOWN
 
