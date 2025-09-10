@@ -52,7 +52,7 @@ class LuAlertConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return LuAlertOptionsFlowHandler(config_entry)
 
 
-class LuAlertOptionsFlowHandler(config_entries.OptionsFlow):
+class LuAlertOptionsFlowHandler(config_entries.OptionsFlowWithReload):
     """Handle an options flow for LU-Alert."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
