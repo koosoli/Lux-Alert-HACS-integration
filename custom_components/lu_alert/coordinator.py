@@ -30,7 +30,9 @@ _LOGGER = logging.getLogger(__name__)
 
 # Define the order of severity for filtering. Higher number is more severe.
 SEVERITY_ORDER = {
-    Severity.UNKNOWN.value: 0,
+    Severity.TEST.value: -2,
+    Severity.UNKNOWN.value: -1,
+    Severity.INFORMATION.value: 0,
     Severity.MINOR.value: 1,
     Severity.MODERATE.value: 2,
     Severity.SEVERE.value: 3,
@@ -39,32 +41,40 @@ SEVERITY_ORDER = {
 
 # Mapping from cb-lu-level parameter to Severity enum
 LEVEL_TO_SEVERITY = {
-    # Extreme (Red alerts, L1)
+    # Extreme (Red alerts, L1/N1)
     "N1": Severity.EXTREME,
     "L1": Severity.EXTREME,
     "ALERT_LVL_4": Severity.EXTREME,
     "LU-Alert Level 4": Severity.EXTREME,
+    "ALERT_LVL_1": Severity.EXTREME,
+    "LU-Alert Level 1": Severity.EXTREME,
 
-    # Severe (Orange alerts, L2)
+    # Severe (Orange alerts, L2/N2)
     "N2": Severity.SEVERE,
     "L2": Severity.SEVERE,
     "ALERT_LVL_2": Severity.SEVERE,
     "LU-Alert Level 2": Severity.SEVERE,
 
-    # Minor (Yellow alerts, L3)
+    # Moderate (Amber alerts, A)
+    "A": Severity.MODERATE,
+    "LU-Alert Amber": Severity.MODERATE,
+
+    # Minor (Yellow alerts, L3/N3)
     "N3": Severity.MINOR,
     "L3": Severity.MINOR,
     "ALERT_LVL_3": Severity.MINOR,
     "LU-Alert Level 3": Severity.MINOR,
-    "ALERT_LVL_1": Severity.MINOR,
-    "LU-Alert Level 1": Severity.MINOR,
 
-    # Moderate (Special case for Amber alerts)
-    "LU-Alert Amber": Severity.MODERATE,
+    # Informational (I)
+    "I": Severity.INFORMATION,
+
+    # Test (T, D)
+    "T": Severity.TEST,
+    "D": Severity.TEST,
 }
 
 # Set of alert levels that should be considered as "Test" and filtered out
-TEST_ALERT_LEVELS = {"D", "T", "LU-Alert Test", "LU-Alert Exercise"}
+TEST_ALERT_LEVELS = {"LU-Alert Test", "LU-Alert Exercise"}
 
 
 class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
