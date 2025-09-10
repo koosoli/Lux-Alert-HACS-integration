@@ -108,17 +108,24 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.info("No alert XML URLs found.")
             return self._get_default_state()
 
+        # Concurrently fetch all XML files to improve performance
+        fetch_tasks = [self._fetch_xml_content(url) for url in xml_urls]
+        all_xml_contents = await asyncio.gather(*fetch_tasks)
+
         all_alerts = []
-        for xml_url in xml_urls:
-            xml_content = await self._fetch_xml_content(xml_url)
+        for i, xml_content in enumerate(all_xml_contents):
             if not xml_content:
-                continue
+                continue  # Skip failed downloads
 
             try:
-                alerts_from_file = await self.hass.async_add_executor_job(parse_xml, xml_content)
+                # Use hass.async_add_executor_job for the CPU-bound parsing
+                alerts_from_file = await self.hass.async_add_executor_job(
+                    parse_xml, xml_content
+                )
                 all_alerts.extend(alerts_from_file)
             except Exception as err:
-                _LOGGER.warning(f"Failed to parse alert XML from {xml_url}: {err}")
+                # Log the specific URL that failed to parse
+                _LOGGER.warning(f"Failed to parse alert XML from {xml_urls[i]}: {err}")
 
         if not all_alerts:
             return self._get_default_state()
@@ -238,8 +245,8 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                         response.raise_for_status()
                         data = await response.json()
                         if data and "resources" in data:
-                            # Only process the most recent 20 files to avoid performance issues
-                            for resource in data["resources"][:20]:
+                            # Process all available XML resources
+                            for resource in data["resources"]:
                                 if resource.get("format", "").lower() == "xml":
                                     url = resource.get("url")
                                     if url:
