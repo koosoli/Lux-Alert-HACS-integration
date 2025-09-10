@@ -143,14 +143,21 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         ]
 
         now = dt_util.utcnow()
+        fourteen_days_ago = now - timedelta(days=14)
         processed_alerts = []
         for alert in filtered_alerts:
             # Prefer English language info, fall back to the first available
-            info = next((i for i in alert.info if i.language and i.language.lower().startswith("en")), alert.info[0])
+            info = next((i for i in alert.info if i.language and i.language.lower().startswith("en")),
+                        alert.info[0])
 
             # Filter out expired alerts
             if info.expires and info.expires < now:
                 _LOGGER.debug(f"Filtering expired alert: {alert.identifier}")
+                continue
+
+            # Filter out old alerts that have no expiration date (after 14 days)
+            if not info.expires and alert.sent and alert.sent < fourteen_days_ago:
+                _LOGGER.debug(f"Filtering old, non-expiring alert: {alert.identifier}")
                 continue
 
             # Filter out test alerts
