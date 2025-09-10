@@ -108,7 +108,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         allowed_categories = {
             Category.GEO, Category.MET, Category.SAFETY, Category.SECURITY,
             Category.RESCUE, Category.FIRE, Category.ENV, Category.TRANSPORT,
-            Category.INFRA
+            Category.INFRA, Category.HEALTH
         }
 
         filtered_alerts = [
