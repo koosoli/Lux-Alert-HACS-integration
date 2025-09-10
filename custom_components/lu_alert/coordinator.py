@@ -44,12 +44,17 @@ LEVEL_TO_SEVERITY = {
     "N2": Severity.SEVERE,
     "N3": Severity.MODERATE,
 
-    # Fallback for older or different formats observed in data
-    "ALERT_LVL_4": Severity.EXTREME,   # Red
-    "ALERT_LVL_3": Severity.SEVERE,    # Orange
-    "ALERT_LVL_2": Severity.MODERATE,  # Yellow
+    # Codes discovered from website text (D=Danger, L1/L2=Levels)
+    "D": Severity.EXTREME,
+    "L2": Severity.SEVERE,
+    "L1": Severity.MODERATE,
+
+    # Fallback for older or other formats observed in data
+    "ALERT_LVL_4": Severity.EXTREME,
+    "ALERT_LVL_3": Severity.SEVERE,
+    "ALERT_LVL_2": Severity.MODERATE,
     "ALERT_LVL_1": Severity.MINOR,
-    "LU-Alert Amber": Severity.MODERATE, # Specific for AMBER alerts
+    "LU-Alert Amber": Severity.MODERATE,
 }
 
 
