@@ -94,8 +94,9 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
     @property
     def min_severity_level(self) -> int:
-        """Get the minimum severity level from config options."""
-        severity_str = self.config_entry.options.get(
+        """Get the minimum severity level from config options or data."""
+        # Prioritize options, but fall back to data for initial setup
+        severity_str = self.config_entry.options.get(CONF_MIN_SEVERITY) or self.config_entry.data.get(
             CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
         )
         return SEVERITY_ORDER.get(severity_str, 0)
@@ -183,14 +184,31 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         # Sort alerts by severity (desc) and then by sent time (desc)
         processed_alerts.sort(key=lambda x: (x["severity_level"], x["sent_time"]), reverse=True)
 
-        primary_headline = "No active alerts"
+        # Count alerts by severity
+        severity_counts = {
+            "extreme": 0,
+            "severe": 0,
+            "moderate": 0,
+            "minor": 0,
+            "information": 0,
+            "unknown": 0,
+            "test": 0,
+        }
+        for alert in processed_alerts:
+            severity_key = alert["severity"].lower()
+            if severity_key in severity_counts:
+                severity_counts[severity_key] += 1
+
+        # Determine highest severity alert
+        highest_severity_alert = None
         if processed_alerts:
-            primary_headline = processed_alerts[0]["headline"]
+            highest_severity_alert = processed_alerts[0]
 
         return {
-            "headline": primary_headline,
             "count": len(processed_alerts),
             "alerts": processed_alerts,
+            "severity_counts": severity_counts,
+            "highest_severity_alert": highest_severity_alert,
         }
 
     def _get_severity(self, info: Info) -> Severity:
@@ -245,4 +263,17 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
     def _get_default_state(self) -> dict:
         """Return a dictionary representing a clear/default state."""
-        return {"headline": "No active alerts", "count": 0, "alerts": []}
+        return {
+            "count": 0,
+            "alerts": [],
+            "severity_counts": {
+                "extreme": 0,
+                "severe": 0,
+                "moderate": 0,
+                "minor": 0,
+                "information": 0,
+                "unknown": 0,
+                "test": 0,
+            },
+            "highest_severity_alert": None,
+        }

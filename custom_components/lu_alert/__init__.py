@@ -9,7 +9,7 @@ from .const import DOMAIN
 from .coordinator import LuAlertDataUpdateCoordinator
 
 # List of platforms that this integration will create.
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
