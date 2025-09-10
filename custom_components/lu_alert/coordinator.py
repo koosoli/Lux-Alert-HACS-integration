@@ -39,28 +39,33 @@ SEVERITY_ORDER = {
 
 # Mapping from cb-lu-level parameter to Severity enum
 LEVEL_TO_SEVERITY = {
-    # Extreme (Red alerts, L1)
-    "N1": Severity.EXTREME,
-    "L1": Severity.EXTREME,
-    "ALERT_LVL_4": Severity.EXTREME,
-    "LU-Alert Level 4": Severity.EXTREME,
+    # Extreme (Red alerts, L1) - Remapped to Minor
+    "N1": Severity.MINOR,
+    "L1": Severity.MINOR,
+    "ALERT_LVL_4": Severity.MINOR,
+    "LU-Alert Level 4": Severity.MINOR,
 
-    # Severe (Orange alerts, L2)
-    "N2": Severity.SEVERE,
-    "L2": Severity.SEVERE,
-    "ALERT_LVL_2": Severity.SEVERE,
-    "LU-Alert Level 2": Severity.SEVERE,
+    # Severe (Orange alerts, L2) - Remapped to Minor
+    "N2": Severity.MINOR,
+    "L2": Severity.MINOR,
+    "ALERT_LVL_2": Severity.MINOR,
+    "LU-Alert Level 2": Severity.MINOR,
 
-    # Minor (Yellow alerts, L3)
+    # Minor (Yellow alerts, L3 and Informational)
     "N3": Severity.MINOR,
     "L3": Severity.MINOR,
+    "I": Severity.MINOR,
     "ALERT_LVL_3": Severity.MINOR,
     "LU-Alert Level 3": Severity.MINOR,
     "ALERT_LVL_1": Severity.MINOR,
     "LU-Alert Level 1": Severity.MINOR,
 
+
     # Moderate (Special case for Amber alerts)
     "LU-Alert Amber": Severity.MODERATE,
+
+    # Unknown
+    "N/A": Severity.UNKNOWN,
 }
 
 # Set of alert levels that should be considered as "Test" and filtered out
