@@ -47,7 +47,7 @@ If the card is not available automatically, you can register it manually:
 1.  Go to **Settings** > **Dashboards**.
 2.  Click the three dots (⋮) in the top-right corner and select **Resources**.
 3.  Click the **+ ADD RESOURCE** button.
-4.  Set the **URL** to `/hacsfiles/lu_alert/lu-alert-card.js`.
+4.  Set the **URL** to `/hacsfiles/Lux-Alert-HACS-integration/lu-alert-card.js`.
 5.  Set the **Resource Type** to `JavaScript Module`.
 6.  Click **CREATE**.
 
