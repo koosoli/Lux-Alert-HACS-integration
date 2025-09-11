@@ -81,11 +81,18 @@ Set the integration's "Minimum Severity" to "Information" to ensure it is aware 
 ```yaml
 type: conditional
 conditions:
-  - entity: binary_sensor.lu_alert_critical_alert_active
-    state: 'on'
+  - condition: or
+    conditions:
+      - entity: binary_sensor.lu_alert_critical_alert_active
+        state: 'on'
+      - entity: binary_sensor.lu_alert_extreme_alert_active
+        state: 'on'
+      - entity: binary_sensor.lu_alert_severe_alert_active
+        state: 'on'
 card:
   type: entities
-  title: 🚨 CRITICAL ALERT 🚨
+  # You might want a more general title now
+  title: 🚨 ACTIVE ALERT 🚨
   entities:
     - sensor.lu_alert_1
     - sensor.lu_alert_2
