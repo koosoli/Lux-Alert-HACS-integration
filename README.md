@@ -8,7 +8,8 @@ It fetches data from the public data portal ([data.public.lu](https://data.publi
 
 - **Main Summary Sensor**: A primary sensor (`sensor.lu_alert`) that provides a count of active alerts and contains all alert details in its attributes.
 - **Indexed Sensors for Dashboards**: Simple sensors (`sensor.lu_alert_1`, `sensor.lu_alert_2`, etc.) where the state is the alert's headline, for easy display on dashboards.
-- **Critical Alert Binary Sensors**: Dedicated binary sensors (e.g., `binary_sensor.lu_alert_critical_active`) that turn `on` for "Severe" or "Extreme" alerts, perfect for critical automations.
+- **Critical Alert Binary Sensors**: Dedicated binary sensors (e.g., `binary_sensor.lu_alert_critical_alert_active`) that turn `on` for "Severe" or "Extreme" alerts, perfect for critical automations.
+- **Custom Lovelace Card**: A simple card to display the alerts on your dashboard.
 - **Single Device**: All entities are grouped under a single "LU-Alert" device to keep your entity list clean.
 - **Configurable Severity Filtering**: A dropdown menu in the configuration allows you to select the minimum severity of alerts you want the integration to process.
 - **UI-Based Configuration**: No YAML required. Add and configure the integration directly from the Home Assistant UI.
@@ -32,6 +33,24 @@ This integration is best installed via the [Home Assistant Community Store (HACS
 4.  You will be prompted to select a **minimum severity level**. Alerts below this level will be ignored by the entire integration. Select your desired level and click **Submit**.
 5.  To change the severity level later, go to the integration's card on the Devices & Services page and click **"Configure"**.
 
+## Dashboard Card
+
+This integration includes a custom Lovelace card (`lu-alert-card`) to display the alerts in a clean and organized way.
+
+### Automatic Installation (HACS)
+
+If you installed this integration via HACS, the card should be automatically registered with Home Assistant. You should be able to find the "Custom: LU-Alert Card" when you add a new card to your dashboard.
+
+### Manual Installation
+
+If the card is not available automatically, you can register it manually:
+1.  Go to **Settings** > **Dashboards**.
+2.  Click the three dots (⋮) in the top-right corner and select **Resources**.
+3.  Click the **+ ADD RESOURCE** button.
+4.  Set the **URL** to `/hacsfiles/lu_alert/lu-alert-card.js`.
+5.  Set the **Resource Type** to `JavaScript Module`.
+6.  Click **CREATE**.
+
 ## Available Entities
 
 The integration provides a set of powerful entities to work with:
@@ -49,7 +68,7 @@ For easy display on dashboards, the integration creates sensors for the top aler
 
 ### Binary Sensors for Automation
 These are perfect for triggering automations for critical events:
--   **`binary_sensor.lu_alert_critical_active`**: Turns `on` if there is any **Severe** OR **Extreme** alert.
+-   **`binary_sensor.lu_alert_critical_alert_active`**: Turns `on` if there is any **Severe** OR **Extreme** alert.
 -   **`binary_sensor.lu_alert_severe_alert_active`**: Turns `on` only for **Severe** alerts.
 -   **`binary_sensor.lu_alert_extreme_alert_active`**: Turns `on` only for **Extreme** alerts.
 
@@ -62,13 +81,23 @@ Set the integration's "Minimum Severity" to "Information" to ensure it is aware 
 ```yaml
 type: conditional
 conditions:
-  - entity: binary_sensor.lu_alert_critical_active
+  - entity: binary_sensor.lu_alert_critical_alert_active
     state: 'on'
 card:
   type: entities
   title: 🚨 CRITICAL ALERT 🚨
   entities:
-    - sensor.lu_alert_alert_1
-    - sensor.lu_alert_alert_2
-    - sensor.lu_alert_alert_3
+    - sensor.lu_alert_1
+    - sensor.lu_alert_2
+    - sensor.lu_alert_3
 ```
+
+## Troubleshooting
+
+### Integration Logo / Thumbnail Not Appearing
+
+After installation via HACS, if you do not see the LU-Alert logo on the integrations page or in the HACS dashboard, please try the following:
+1.  Force-reload the page in your browser (e.g., Ctrl+F5 or Cmd+Shift+R).
+2.  Clear your browser's cache.
+3.  Restart Home Assistant.
+This is often due to caching on the browser or Home Assistant frontend.
