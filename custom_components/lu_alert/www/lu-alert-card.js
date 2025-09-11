@@ -80,7 +80,7 @@ class LuAlertCard extends HTMLElement {
           <div class="details">
             <strong>Severity:</strong> ${alert.severity} | <strong>Event:</strong> ${alert.event}
           </div>
-          <div class="description">${alert.description.replace(/<[^>]*>?/gm, '')}</div>
+          <div class="description">${alert.description}</div>
         </div>
       `).join('');
     }

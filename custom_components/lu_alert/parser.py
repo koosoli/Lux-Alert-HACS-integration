@@ -8,6 +8,16 @@ from .builder import CAP_XMLNS  # Reuse the namespace constant
 # Generic TypeVar for Enum types
 T = TypeVar('T', bound='Enum')
 
+def _get_inner_html(element: Optional[ET.Element]) -> Optional[str]:
+    """Helper to get the full inner HTML of an element."""
+    if element is None:
+        return None
+    # This combines the initial text with the serialized child elements.
+    # The tail of each child is included by tostring.
+    return (element.text or "") + "".join(
+        ET.tostring(child, encoding="unicode") for child in element
+    )
+
 def _find_text(element: ET.Element, tag: str, namespace: str) -> Optional[str]:
     """Helper to find the text content of a single namespaced child element."""
     child = element.find(f"{{{namespace}}}{tag}")
@@ -96,7 +106,7 @@ def parse_xml(xml_string: str) -> List[Alert]:
                 expires=_to_datetime(_find_text(info_element, "expires", ns)),
                 senderName=_find_text(info_element, "senderName", ns),
                 headline=_find_text(info_element, "headline", ns),
-                description=_find_text(info_element, "description", ns),
+                description=_get_inner_html(info_element.find(f"{{{ns}}}description")),
                 instruction=_find_text(info_element, "instruction", ns),
                 web=_find_text(info_element, "web", ns),
                 parameters=param_list,
