@@ -89,7 +89,8 @@ class LuAlertCriticalActiveBinarySensor(LuAlertBaseBinarySensor):
         """Initialize the binary sensor."""
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{self.entry.entry_id}_critical_active"
-        self._attr_name = "Critical Active"
+        self._attr_name = "Critical Alert Active"
+        self.entity_id = "binary_sensor.lu_alert_critical_active"
 
     @property
     def is_on(self) -> bool:
