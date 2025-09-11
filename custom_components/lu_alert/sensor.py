@@ -145,12 +145,6 @@ class LuAlertIndexedSensor(LuAlertBaseSensor):
         self._attr_name = f"{index + 1}"
 
     @property
-    def name(self) -> str:
-        """Return the friendly name of the sensor."""
-        # This will be the friendly name shown in the UI
-        return f"{DEFAULT_NAME} {self.index + 1}"
-
-    @property
     def alert_data(self) -> dict[str, Any] | None:
         """Return the alert data for this sensor's index."""
         if self.coordinator.data and len(self.coordinator.data.get("alerts", [])) > self.index:
