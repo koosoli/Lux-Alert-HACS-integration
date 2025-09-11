@@ -91,13 +91,3 @@ card:
     - sensor.lu_alert_2
     - sensor.lu_alert_3
 ```
-
-## Troubleshooting
-
-### Integration Logo / Thumbnail Not Appearing
-
-After installation via HACS, if you do not see the LU-Alert logo on the integrations page or in the HACS dashboard, please try the following:
-1.  Force-reload the page in your browser (e.g., Ctrl+F5 or Cmd+Shift+R).
-2.  Clear your browser's cache.
-3.  Restart Home Assistant.
-This is often due to caching on the browser or Home Assistant frontend.
