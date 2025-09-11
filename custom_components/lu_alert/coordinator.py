@@ -177,22 +177,39 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             # Filter based on the user's configuration for minimum severity
             if alert_severity_level >= self.min_severity_level:
                 processed_alerts.append({
-                    "severity_level": alert_severity_level,
-                    "sent_time": alert.sent or datetime.min,
-                    "status": alert.status.value if alert.status else "Not Provided",
-                    "msgType": alert.msgType.value if alert.msgType else "Not Provided",
-                    "event": info.event or "Not Provided",
+                    "identifier": alert.identifier or "Not Provided",
                     "headline": info.headline or "Not Provided",
                     "description": info.description or "Not Provided",
                     "instruction": info.instruction or "Not Provided",
+                    "severity_level": alert_severity_level,
+                    "severity": alert_severity_str,
+                    "status": alert.status.value if alert.status else "Not Provided",
+                    "msgType": alert.msgType.value if alert.msgType else "Not Provided",
+                    "event": info.event or "Not Provided",
                     "senderName": info.senderName or "Not Provided",
                     "certainty": info.certainty.value if info.certainty else "Not Provided",
-                    "severity": alert_severity_str,
                     "urgency": info.urgency.value if info.urgency else "Not Provided",
                     "sent": alert.sent.isoformat() if alert.sent else "Not Provided",
+                    "sent_time": alert.sent or datetime.min,
                     "expires": info.expires.isoformat() if info.expires else "Not Provided",
                     "web": info.web or "Not Provided",
-                    "identifier": alert.identifier or "Not Provided",
+                    "language": info.language or "Not Provided",
+                    "category": [c.value for c in info.category if c] or ["Not Provided"],
+                    "effective": info.effective.isoformat() if info.effective else "Not Provided",
+                    "area": [
+                        {
+                            "areaDesc": a.areaDesc,
+                            "polygon": a.polygon,
+                            "circle": a.circle,
+                            "geocode": a.geocode,
+                        }
+                        for a in info.area
+                    ] or ["Not Provided"],
+                    "sender": alert.sender or "Not Provided",
+                    "scope": alert.scope.value if alert.scope else "Not Provided",
+                    "code": [c.value for c in alert.code if c] or ["Not Provided"],
+                    "note": alert.note or "Not Provided",
+                    "references": alert.references or "Not Provided",
                 })
 
         # Sort alerts by severity (desc) and then by sent time (desc)

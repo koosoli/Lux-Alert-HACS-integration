@@ -4,7 +4,7 @@
   "documentation": "https://github.com/koosoli/Lux-Alert-HACS-integration",
   "issue_tracker": "https://github.com/koosoli/Lux-Alert-HACS-integration/issues",
   "codeowners": ["@koosoli"],
-  "version": "1.0.0",
+  "version": "1.1.0",
   "iot_class": "cloud_polling",
   "config_flow": true,
   "dependencies": [],
