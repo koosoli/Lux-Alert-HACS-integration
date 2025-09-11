@@ -91,3 +91,4 @@ card:
     - sensor.lu_alert_2
     - sensor.lu_alert_3
 ```
+
