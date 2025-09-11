@@ -139,8 +139,16 @@ class LuAlertIndexedSensor(LuAlertBaseSensor):
         """Initialize the indexed sensor."""
         super().__init__(coordinator, entry)
         self.index = index
+        # The unique ID needs to be stable and unique
         self._attr_unique_id = f"{self.entry.entry_id}_{index + 1}"
-        self._attr_name = f"{DEFAULT_NAME} {index + 1}"
+        # This will be used to generate the entity_id, e.g., sensor.lu_alert_1
+        self._attr_name = f"{index + 1}"
+
+    @property
+    def name(self) -> str:
+        """Return the friendly name of the sensor."""
+        # This will be the friendly name shown in the UI
+        return f"{DEFAULT_NAME} {self.index + 1}"
 
     @property
     def alert_data(self) -> dict[str, Any] | None:

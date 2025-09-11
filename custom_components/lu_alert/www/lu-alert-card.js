@@ -96,3 +96,11 @@ class LuAlertCard extends HTMLElement {
 }
 
 customElements.define('lu-alert-card', LuAlertCard);
+
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: 'lu-alert-card',
+  name: 'LU-Alert Card',
+  description: 'A card to display LU-Alert (Luxembourg) alerts.',
+  preview: true,
+});
