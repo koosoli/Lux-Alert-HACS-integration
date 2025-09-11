@@ -91,7 +91,6 @@ conditions:
         state: 'on'
 card:
   type: entities
-  # You might want a more general title now
   title: 🚨 ACTIVE ALERT 🚨
   entities:
     - sensor.lu_alert_1
