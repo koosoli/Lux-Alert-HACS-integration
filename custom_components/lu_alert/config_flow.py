@@ -87,14 +87,6 @@ class LuAlertConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(
                     CONF_WATCHLIST_KEYWORDS, default=DEFAULT_WATCHLIST_KEYWORDS
                 ): str,
-                vol.Optional(CONF_ALLERGENS, default=DEFAULT_ALLERGENS): SelectSelector(
-                    SelectSelectorConfig(
-                        options=ALLERGEN_LIST,
-                        multiple=True,
-                        mode=SelectSelectorMode.LIST,
-                        custom_value=True,
-                    )
-                ),
             }
         )
 
