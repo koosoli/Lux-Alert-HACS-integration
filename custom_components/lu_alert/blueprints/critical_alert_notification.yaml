@@ -1,0 +1,42 @@
+blueprint:
+  name: LU-Alert Critical Alert Notification
+  description: Sends a notification when a new critical (Severe or Extreme) LU-Alert is published.
+  domain: automation
+  input:
+    notification_device:
+      name: Notification Device
+      description: The device to send the notification to.
+      selector:
+        device:
+          integration: mobile_app
+
+    notification_channel:
+      name: Notification Channel (Optional)
+      description: The channel to send the notification to (e.g., "Alerts"). Requires the "channel" parameter in your notification service.
+      default: ""
+
+trigger:
+  - platform: state
+    entity_id: binary_sensor.lu_alert_critical_active
+    to: "on"
+
+variables:
+  highest_severity_sensor: "sensor.lu_alert_highest_severity"
+  headline: "{{ state_attr(highest_severity_sensor, 'headline') }}"
+  description: "{{ state_attr(highest_severity_sensor, 'description') }}"
+  severity: "{{ state_attr(highest_severity_sensor, 'severity') }}"
+  event: "{{ state_attr(highest_severity_sensor, 'event') }}"
+
+action:
+  - device_id: !input notification_device
+    domain: mobile_app
+    type: notify
+    title: "🚨 CRITICAL ALERT: {{ severity }} - {{ event }}"
+    message: "{{ headline }}"
+    data: >
+      {% set channel = notification_channel %}
+      {% if channel %}
+        { "channel": "{{ channel }}", "priority": "high" }
+      {% else %}
+        { "priority": "high" }
+      {% endif %}

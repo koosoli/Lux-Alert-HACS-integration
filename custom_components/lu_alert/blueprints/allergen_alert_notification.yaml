@@ -1,0 +1,42 @@
+blueprint:
+  name: LU-Alert Allergen Alert Notification
+  description: Sends a notification when a new LU-Alert is published that matches your configured allergen list.
+  domain: automation
+  input:
+    notification_device:
+      name: Notification Device
+      description: The device to send the notification to.
+      selector:
+        device:
+          integration: mobile_app
+
+    notification_channel:
+      name: Notification Channel (Optional)
+      description: The channel to send the notification to (e.g., "Alerts"). Requires the "channel" parameter in your notification service.
+      default: ""
+
+trigger:
+  - platform: state
+    entity_id: binary_sensor.lu_alert_allergen_match
+    to: "on"
+
+variables:
+  alerts: "{{ state_attr('sensor.lu_alert', 'alerts') }}"
+  allergen_alerts: "{{ alerts | selectattr('allergen_match', 'eq', true) | list }}"
+
+action:
+  - repeat:
+      for_each: "{{ allergen_alerts }}"
+      sequence:
+        - device_id: !input notification_device
+          domain: mobile_app
+          type: notify
+          title: "⚠️ ALLERGEN ALERT: {{ repeat.item.event }}"
+          message: "{{ repeat.item.headline }}"
+          data: >
+            {% set channel = notification_channel %}
+            {% if channel %}
+              { "channel": "{{ channel }}", "priority": "high" }
+            {% else %}
+              { "priority": "high" }
+            {% endif %}
