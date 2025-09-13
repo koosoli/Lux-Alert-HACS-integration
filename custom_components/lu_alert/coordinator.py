@@ -21,10 +21,17 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     CONF_MIN_SEVERITY,
     DEFAULT_MIN_SEVERITY,
+    CONF_ENABLE_LOCATION_FILTER,
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    DEFAULT_ENABLE_LOCATION_FILTER,
+    CONF_ALLERGENS,
+    DEFAULT_ALLERGENS,
 )
 from .parser import parse_xml
-from .enums import Severity, Category
-from .models import Info
+from .utils import is_point_in_polygons
+from .enums import Severity, Category, MsgType
+from .models import Alert, Info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,6 +86,23 @@ LEVEL_TO_SEVERITY = {
 TEST_ALERT_LEVELS = {"T", "D", "LU-Alert Test", "LU-Alert Exercise"}
 
 
+def _parse_references(references_str: str | None) -> list[str]:
+    """Parse the references string into a list of alert identifiers."""
+    if not references_str:
+        return []
+
+    identifiers = []
+    # The string is space-separated, and each part is comma-separated.
+    parts = references_str.strip().split()
+    for part in parts:
+        # Each part is like "sender,identifier,sent_time"
+        sub_parts = part.split(',')
+        if len(sub_parts) > 1:
+            # The identifier is the second element
+            identifiers.append(sub_parts[1])
+    return identifiers
+
+
 class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
     """A coordinator to fetch, parse, and filter LU-Alert data."""
 
@@ -127,7 +151,43 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                 # Log the specific URL that failed to parse
                 _LOGGER.warning(f"Failed to parse alert XML from {xml_urls[i]}: {err}")
 
+        # --- Start of new deduplication logic ---
         if not all_alerts:
+            return self._get_default_state()
+
+        # 1. Create a dictionary of alerts by ID, keeping the most recent one.
+        alerts_by_id: dict[str, Alert] = {}
+        for alert in all_alerts:
+            if not alert.identifier or not alert.sent:
+                continue
+            if (
+                alert.identifier not in alerts_by_id
+                or alert.sent > alerts_by_id[alert.identifier].sent
+            ):
+                alerts_by_id[alert.identifier] = alert
+
+        # 2. Identify all superseded or canceled alerts.
+        ids_to_remove = set()
+        for alert in alerts_by_id.values():
+            # If an alert is a cancellation, it should be removed.
+            if alert.msgType == MsgType.CANCEL:
+                ids_to_remove.add(alert.identifier)
+
+            # The alerts it refers to should also be removed.
+            if alert.references:
+                referenced_ids = _parse_references(alert.references)
+                for ref_id in referenced_ids:
+                    ids_to_remove.add(ref_id)
+
+        # 3. Create the final list of active, deduplicated alerts.
+        active_alerts = [
+            alert
+            for identifier, alert in alerts_by_id.items()
+            if identifier not in ids_to_remove
+        ]
+        # --- End of new deduplication logic ---
+
+        if not active_alerts:
             return self._get_default_state()
 
         # Filter for relevant alert categories
@@ -137,8 +197,9 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             Category.INFRA, Category.HEALTH
         }
 
+        # Use `active_alerts` instead of `all_alerts`
         filtered_alerts = [
-            alert for alert in all_alerts
+            alert for alert in active_alerts
             if alert.info and any(cat in allowed_categories for cat in alert.info[0].category)
         ]
 
@@ -177,26 +238,96 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             # Filter based on the user's configuration for minimum severity
             if alert_severity_level >= self.min_severity_level:
                 processed_alerts.append({
-                    "severity_level": alert_severity_level,
-                    "sent_time": alert.sent or datetime.min,
-                    "status": alert.status.value if alert.status else "Not Provided",
-                    "msgType": alert.msgType.value if alert.msgType else "Not Provided",
-                    "event": info.event or "Not Provided",
+                    "identifier": alert.identifier or "Not Provided",
                     "headline": info.headline or "Not Provided",
                     "description": info.description or "Not Provided",
                     "instruction": info.instruction or "Not Provided",
+                    "severity_level": alert_severity_level,
+                    "severity": alert_severity_str,
+                    "status": alert.status.value if alert.status else "Not Provided",
+                    "msgType": alert.msgType.value if alert.msgType else "Not Provided",
+                    "event": info.event or "Not Provided",
                     "senderName": info.senderName or "Not Provided",
                     "certainty": info.certainty.value if info.certainty else "Not Provided",
-                    "severity": alert_severity_str,
                     "urgency": info.urgency.value if info.urgency else "Not Provided",
                     "sent": alert.sent.isoformat() if alert.sent else "Not Provided",
+                    "sent_time": alert.sent or datetime.min,
                     "expires": info.expires.isoformat() if info.expires else "Not Provided",
                     "web": info.web or "Not Provided",
-                    "identifier": alert.identifier or "Not Provided",
+                    "language": info.language or "Not Provided",
+                    "category": [c.value for c in info.category if c] or ["Not Provided"],
+                    "effective": info.effective.isoformat() if info.effective else "Not Provided",
+                    "area": [
+                        {
+                            "areaDesc": a.areaDesc,
+                            "polygon": a.polygon,
+                            "circle": a.circle,
+                            "geocode": a.geocode,
+                        }
+                        for a in info.area
+                    ] or ["Not Provided"],
+                    "sender": alert.sender or "Not Provided",
+                    "scope": alert.scope.value if alert.scope else "Not Provided",
+                    "code": [c.value for c in alert.code if c] or ["Not Provided"],
+                    "note": alert.note or "Not Provided",
+                    "references": alert.references or "Not Provided",
+                    "structured_description": info.structured_description or {},
                 })
 
         # Sort alerts by severity (desc) and then by sent time (desc)
         processed_alerts.sort(key=lambda x: (x["severity_level"], x["sent_time"]), reverse=True)
+
+        # --- New: Location Filtering ---
+        location_filter_enabled = self.config_entry.options.get(
+            CONF_ENABLE_LOCATION_FILTER, DEFAULT_ENABLE_LOCATION_FILTER
+        )
+        if location_filter_enabled:
+            user_lat = self.config_entry.options.get(CONF_LATITUDE, self.hass.config.latitude)
+            user_lon = self.config_entry.options.get(CONF_LONGITUDE, self.hass.config.longitude)
+
+            if user_lat is not None and user_lon is not None:
+                for alert in processed_alerts:
+                    # An alert is local if the user's point is in any of its polygons
+                    polygons = [
+                        area["polygon"]
+                        for area in alert.get("area", [])
+                        if area and area.get("polygon")
+                    ]
+                    alert["is_local"] = is_point_in_polygons(user_lat, user_lon, polygons)
+            else:
+                # If location isn't configured, mark all as not local
+                 for alert in processed_alerts:
+                    alert["is_local"] = False
+        else:
+            # If the filter is disabled, mark all as not local
+            for alert in processed_alerts:
+                alert["is_local"] = False
+        # --- End Location Filtering ---
+
+        # --- New: Allergen Matching ---
+        user_allergens = {
+            allergen.lower()
+            for allergen in self.config_entry.options.get(CONF_ALLERGENS, DEFAULT_ALLERGENS)
+        }
+        if user_allergens:
+            for alert in processed_alerts:
+                alert["allergen_match"] = False
+                # Combine all text fields where an allergen could be mentioned
+                search_text = (
+                    (alert.get("headline", "") or "")
+                    + " "
+                    + (alert.get("description", "") or "")
+                    + " "
+                    + (alert.get("event", "") or "")
+                ).lower()
+
+                if any(allergen in search_text for allergen in user_allergens):
+                    alert["allergen_match"] = True
+        else:
+            for alert in processed_alerts:
+                alert["allergen_match"] = False
+        # --- End Allergen Matching ---
+
 
         # Count alerts by severity
         severity_counts = {

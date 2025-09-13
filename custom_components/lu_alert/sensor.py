@@ -131,6 +131,7 @@ class LuAlertHighestSeveritySensor(LuAlertBaseSensor):
 class LuAlertIndexedSensor(LuAlertBaseSensor):
     """A sensor for a single alert, identified by its index."""
 
+    _attr_has_entity_name = False  # Override base class
     _attr_icon = "mdi:alert-outline"
 
     def __init__(
@@ -139,8 +140,10 @@ class LuAlertIndexedSensor(LuAlertBaseSensor):
         """Initialize the indexed sensor."""
         super().__init__(coordinator, entry)
         self.index = index
-        self._attr_unique_id = f"{self.entry.entry_id}_alert_{index + 1}"
-        self._attr_name = f"Alert {index + 1}"
+        # The unique ID needs to be stable and unique
+        self._attr_unique_id = f"{self.entry.entry_id}_{index + 1}"
+        # Set the full friendly name. The entity ID will be derived from this.
+        self._attr_name = f"{DEFAULT_NAME} {index + 1}"
 
     @property
     def alert_data(self) -> dict[str, Any] | None:

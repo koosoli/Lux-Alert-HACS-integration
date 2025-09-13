@@ -2,5 +2,12 @@
   "name": "LU-Alert",
   "render_readme": true,
   "country": "LU",
-  "domains": ["sensor"]
+  "domains": ["sensor", "binary_sensor"],
+  "lovelace": [
+    {
+      "path": "/hacsfiles/Lux-Alert-HACS-integration/lu-alert-card.js",
+      "embed": true,
+      "type": "module"
+    }
+  ]
 }

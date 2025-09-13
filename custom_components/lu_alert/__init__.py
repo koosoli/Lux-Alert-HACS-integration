@@ -30,6 +30,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Forward the setup to the sensor platform.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Register the Lovelace card if it's not already registered
+    if "lovelace" in hass.data:
+        resources = hass.data["lovelace"].get("resources")
+        if resources:
+            card_url = f"/hacsfiles/{DOMAIN}/lu-alert-card.js"
+            if not any(res["url"] == card_url for res in resources.async_items()):
+                resources.async_create_item(
+                    {"res_type": "module", "url": card_url}
+                )
+
     return True
 
 

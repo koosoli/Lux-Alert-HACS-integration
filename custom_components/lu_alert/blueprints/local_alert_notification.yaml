@@ -1,0 +1,40 @@
+blueprint:
+  name: LU-Alert Local Alert Notification
+  description: Sends a notification when a new LU-Alert is published that is relevant to your configured location.
+  domain: automation
+  input:
+    notification_device:
+      name: Notification Device
+      description: The device to send the notification to.
+      selector:
+        device:
+          integration: mobile_app
+
+    notification_channel:
+      name: Notification Channel (Optional)
+      description: The channel to send the notification to (e.g., "Alerts"). Requires the "channel" parameter in your notification service.
+      default: ""
+
+trigger:
+  - platform: state
+    entity_id: binary_sensor.lu_alert_local_alert_active
+    to: "on"
+
+variables:
+  alerts: "{{ state_attr('sensor.lu_alert', 'alerts') }}"
+  local_alerts: "{{ alerts | selectattr('is_local', 'eq', true) | list }}"
+
+action:
+  - repeat:
+      for_each: "{{ local_alerts }}"
+      sequence:
+        - device_id: !input notification_device
+          domain: mobile_app
+          type: notify
+          title: "📍 LOCAL ALERT: {{ repeat.item.severity }} - {{ repeat.item.event }}"
+          message: "{{ repeat.item.headline }}"
+          data: >
+            {% set channel = notification_channel %}
+            {% if channel %}
+              { "channel": "{{ channel }}" }
+            {% endif %}

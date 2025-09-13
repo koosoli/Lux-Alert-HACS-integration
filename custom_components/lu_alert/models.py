@@ -47,6 +47,7 @@ class Info:
     web: Optional[str] = None
     contact: Optional[str] = None
     parameters: List[Parameter] = field(default_factory=list)
+    structured_description: Optional[dict] = None
 
 
 @dataclass

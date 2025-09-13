@@ -8,6 +8,68 @@ from .builder import CAP_XMLNS  # Reuse the namespace constant
 # Generic TypeVar for Enum types
 T = TypeVar('T', bound='Enum')
 
+def _get_inner_html(element: Optional[ET.Element]) -> Optional[str]:
+    """Helper to get the full inner HTML of an element."""
+    if element is None:
+        return None
+    # This combines the initial text with the serialized child elements.
+    # The tail of each child is included by tostring.
+    return (element.text or "") + "".join(
+        ET.tostring(child, encoding="unicode") for child in element
+    )
+
+
+def _parse_html_description(html_string: Optional[str]) -> dict[str, str]:
+    """
+    Parses an HTML string from a description to extract key-value data.
+    It robustly handles different structures within the HTML.
+    """
+    if not html_string:
+        return {}
+
+    try:
+        # Sanitize and wrap HTML to ensure it's parsable as XML
+        sanitized_html = html_string.replace("&nbsp;", " ").replace("<br>", "<br/>")
+        root = ET.fromstring(f"<div>{sanitized_html}</div>")
+    except ET.ParseError:
+        return {}
+
+    data = {}
+
+    # Helper to get all text from an element, including children
+    def get_full_text(element):
+        return "".join(element.itertext()).strip()
+
+    # Process <li> tags, which are the most common structure
+    for li in root.findall(".//li"):
+        strong_tag = li.find("strong")
+        if strong_tag is not None and strong_tag.text:
+            key_text = get_full_text(strong_tag)
+            key = key_text.strip().rstrip(":").lower().replace(" ", "_").replace("(", "").replace(")", "")
+
+            # The value is the rest of the text in the <li> after the key
+            full_li_text = get_full_text(li)
+            value = full_li_text[len(key_text):].strip()
+
+            if key and value:
+                data[key] = value
+
+    # Process <p> tags for cases like "Reason"
+    for p in root.findall(".//p"):
+        strong_tag = p.find("strong")
+        if strong_tag is not None and strong_tag.text:
+            key_text = get_full_text(strong_tag)
+            key = key_text.strip().rstrip(":").lower().replace(" ", "_").replace("(", "").replace(")", "")
+
+            # The value is the rest of the text in the <p> after the key
+            full_p_text = get_full_text(p)
+            value = full_p_text[len(key_text):].strip()
+
+            if key and value:
+                data[key] = value
+
+    return data
+
 def _find_text(element: ET.Element, tag: str, namespace: str) -> Optional[str]:
     """Helper to find the text content of a single namespaced child element."""
     child = element.find(f"{{{namespace}}}{tag}")
@@ -96,11 +158,14 @@ def parse_xml(xml_string: str) -> List[Alert]:
                 expires=_to_datetime(_find_text(info_element, "expires", ns)),
                 senderName=_find_text(info_element, "senderName", ns),
                 headline=_find_text(info_element, "headline", ns),
-                description=_find_text(info_element, "description", ns),
+                description=_get_inner_html(info_element.find(f"{{{ns}}}description")),
                 instruction=_find_text(info_element, "instruction", ns),
                 web=_find_text(info_element, "web", ns),
                 parameters=param_list,
-                area=area_list
+                area=area_list,
+                structured_description=_parse_html_description(
+                    _get_inner_html(info_element.find(f"{{{ns}}}description"))
+                ),
             )
             info_list.append(info_obj)
 
