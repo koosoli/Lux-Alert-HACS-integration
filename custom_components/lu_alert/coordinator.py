@@ -21,8 +21,15 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     CONF_MIN_SEVERITY,
     DEFAULT_MIN_SEVERITY,
+    CONF_ENABLE_LOCATION_FILTER,
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    DEFAULT_ENABLE_LOCATION_FILTER,
+    CONF_ALLERGENS,
+    DEFAULT_ALLERGENS,
 )
 from .parser import parse_xml
+from .utils import is_point_in_polygons
 from .enums import Severity, Category, MsgType
 from .models import Alert, Info
 
@@ -264,10 +271,63 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                     "code": [c.value for c in alert.code if c] or ["Not Provided"],
                     "note": alert.note or "Not Provided",
                     "references": alert.references or "Not Provided",
+                    "structured_description": info.structured_description or {},
                 })
 
         # Sort alerts by severity (desc) and then by sent time (desc)
         processed_alerts.sort(key=lambda x: (x["severity_level"], x["sent_time"]), reverse=True)
+
+        # --- New: Location Filtering ---
+        location_filter_enabled = self.config_entry.options.get(
+            CONF_ENABLE_LOCATION_FILTER, DEFAULT_ENABLE_LOCATION_FILTER
+        )
+        if location_filter_enabled:
+            user_lat = self.config_entry.options.get(CONF_LATITUDE, self.hass.config.latitude)
+            user_lon = self.config_entry.options.get(CONF_LONGITUDE, self.hass.config.longitude)
+
+            if user_lat is not None and user_lon is not None:
+                for alert in processed_alerts:
+                    # An alert is local if the user's point is in any of its polygons
+                    polygons = [
+                        area["polygon"]
+                        for area in alert.get("area", [])
+                        if area and area.get("polygon")
+                    ]
+                    alert["is_local"] = is_point_in_polygons(user_lat, user_lon, polygons)
+            else:
+                # If location isn't configured, mark all as not local
+                 for alert in processed_alerts:
+                    alert["is_local"] = False
+        else:
+            # If the filter is disabled, mark all as not local
+            for alert in processed_alerts:
+                alert["is_local"] = False
+        # --- End Location Filtering ---
+
+        # --- New: Allergen Matching ---
+        user_allergens = {
+            allergen.lower()
+            for allergen in self.config_entry.options.get(CONF_ALLERGENS, DEFAULT_ALLERGENS)
+        }
+        if user_allergens:
+            for alert in processed_alerts:
+                alert["allergen_match"] = False
+                # Combine all text fields where an allergen could be mentioned
+                search_text = (
+                    (alert.get("headline", "") or "")
+                    + " "
+                    + (alert.get("description", "") or "")
+                    + " "
+                    + (alert.get("event", "") or "")
+                ).lower()
+
+                if any(allergen in search_text for allergen in user_allergens):
+                    alert["allergen_match"] = True
+        else:
+            for alert in processed_alerts:
+                alert["allergen_match"] = False
+        # --- End Allergen Matching ---
+
 
         # Count alerts by severity
         severity_counts = {
