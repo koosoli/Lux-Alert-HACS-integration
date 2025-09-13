@@ -60,7 +60,12 @@ class LuAlertConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(
                     CONF_MIN_SEVERITY, default=DEFAULT_MIN_SEVERITY
-                ): vol.In(SEVERITY_LEVELS),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=SEVERITY_LEVELS,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
                 vol.Optional(
                     CONF_ENABLE_LOCATION_FILTER,
                     default=DEFAULT_ENABLE_LOCATION_FILTER,
@@ -127,7 +132,12 @@ class LuAlertOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                     default=self.config_entry.options.get(
                         CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
                     ),
-                ): vol.In(SEVERITY_LEVELS),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=SEVERITY_LEVELS,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
                 vol.Optional(
                     CONF_ENABLE_LOCATION_FILTER,
                     default=self.config_entry.options.get(
