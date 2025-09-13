@@ -88,7 +88,8 @@ class LuAlertConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     SelectSelectorConfig(
                         options=ALLERGEN_LIST,
                         multiple=True,
-                        mode=SelectSelectorMode.DROPDOWN,
+                        mode=SelectSelectorMode.LIST,
+                        custom_value=True,
                     )
                 ),
             }
@@ -170,7 +171,8 @@ class LuAlertOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                     SelectSelectorConfig(
                         options=ALLERGEN_LIST,
                         multiple=True,
-                        mode=SelectSelectorMode.DROPDOWN,
+                        mode=SelectSelectorMode.LIST,
+                        custom_value=True,
                     )
                 ),
             }
