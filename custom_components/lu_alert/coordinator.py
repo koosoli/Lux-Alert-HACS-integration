@@ -23,8 +23,8 @@ from .const import (
     DEFAULT_MIN_SEVERITY,
 )
 from .parser import parse_xml
-from .enums import Severity, Category
-from .models import Info
+from .enums import Severity, Category, MsgType
+from .models import Alert, Info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,6 +79,23 @@ LEVEL_TO_SEVERITY = {
 TEST_ALERT_LEVELS = {"T", "D", "LU-Alert Test", "LU-Alert Exercise"}
 
 
+def _parse_references(references_str: str | None) -> list[str]:
+    """Parse the references string into a list of alert identifiers."""
+    if not references_str:
+        return []
+
+    identifiers = []
+    # The string is space-separated, and each part is comma-separated.
+    parts = references_str.strip().split()
+    for part in parts:
+        # Each part is like "sender,identifier,sent_time"
+        sub_parts = part.split(',')
+        if len(sub_parts) > 1:
+            # The identifier is the second element
+            identifiers.append(sub_parts[1])
+    return identifiers
+
+
 class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
     """A coordinator to fetch, parse, and filter LU-Alert data."""
 
@@ -127,7 +144,43 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                 # Log the specific URL that failed to parse
                 _LOGGER.warning(f"Failed to parse alert XML from {xml_urls[i]}: {err}")
 
+        # --- Start of new deduplication logic ---
         if not all_alerts:
+            return self._get_default_state()
+
+        # 1. Create a dictionary of alerts by ID, keeping the most recent one.
+        alerts_by_id: dict[str, Alert] = {}
+        for alert in all_alerts:
+            if not alert.identifier or not alert.sent:
+                continue
+            if (
+                alert.identifier not in alerts_by_id
+                or alert.sent > alerts_by_id[alert.identifier].sent
+            ):
+                alerts_by_id[alert.identifier] = alert
+
+        # 2. Identify all superseded or canceled alerts.
+        ids_to_remove = set()
+        for alert in alerts_by_id.values():
+            # If an alert is a cancellation, it should be removed.
+            if alert.msgType == MsgType.CANCEL:
+                ids_to_remove.add(alert.identifier)
+
+            # The alerts it refers to should also be removed.
+            if alert.references:
+                referenced_ids = _parse_references(alert.references)
+                for ref_id in referenced_ids:
+                    ids_to_remove.add(ref_id)
+
+        # 3. Create the final list of active, deduplicated alerts.
+        active_alerts = [
+            alert
+            for identifier, alert in alerts_by_id.items()
+            if identifier not in ids_to_remove
+        ]
+        # --- End of new deduplication logic ---
+
+        if not active_alerts:
             return self._get_default_state()
 
         # Filter for relevant alert categories
@@ -137,8 +190,9 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             Category.INFRA, Category.HEALTH
         }
 
+        # Use `active_alerts` instead of `all_alerts`
         filtered_alerts = [
-            alert for alert in all_alerts
+            alert for alert in active_alerts
             if alert.info and any(cat in allowed_categories for cat in alert.info[0].category)
         ]
 
