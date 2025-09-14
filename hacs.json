@@ -5,7 +5,7 @@
   "domains": ["sensor", "binary_sensor"],
   "lovelace": [
     {
-      "path": "/hacsfiles/Lux-Alert-HACS-integration/lu-alert-card.js",
+      "path": "/hacsfiles/lu_alert/lu-alert-card.js",
       "embed": true,
       "type": "module"
     }

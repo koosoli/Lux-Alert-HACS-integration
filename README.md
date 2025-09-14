@@ -33,6 +33,15 @@ This integration is best installed via the [Home Assistant Community Store (HACS
 4.  You will be prompted to select a **minimum severity level**. Alerts below this level will be ignored by the entire integration. Select your desired level and click **Submit**.
 5.  To change the severity level later, go to the integration's card on the Devices & Services page and click **"Configure"**.
 
+## Advanced Configuration
+
+In the integration's options, you can also configure the following advanced features:
+
+*   **Enable Location Filter**: When enabled, only alerts that are relevant to your Home Assistant's location will be shown. You can configure your Home Assistant's location in the General Configuration settings.
+*   **Latitude and Longitude**: If you want to use a different location than your Home Assistant's default, you can specify a custom latitude and longitude.
+*   **Watchlist Keywords**: You can specify a comma-separated list of keywords. Only alerts that contain one or more of these keywords in their headline or description will be shown.
+*   **Allergens**: You can select a list of allergens. Only alerts that are related to one or more of these allergens will be shown.
+
 ## Dashboard Card
 
 This integration includes a custom Lovelace card (`lu-alert-card`) to display the alerts in a clean and organized way.

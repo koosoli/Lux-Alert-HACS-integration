@@ -75,7 +75,57 @@ class LuAlertOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                     default=self.config_entry.options.get(
                         CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
                     ),
-                ): vol.In(SEVERITY_LEVELS),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=SEVERITY_LEVELS,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(
+                    CONF_ENABLE_LOCATION_FILTER,
+                    default=self.config_entry.options.get(
+                        CONF_ENABLE_LOCATION_FILTER, DEFAULT_ENABLE_LOCATION_FILTER
+                    ),
+                ): bool,
+                vol.Optional(
+                    CONF_LATITUDE,
+                    default=self.config_entry.options.get(
+                        CONF_LATITUDE, self.hass.config.latitude
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=-90, max=90, step=0.000001, mode=NumberSelectorMode.BOX
+                    )
+                ),
+                vol.Optional(
+                    CONF_LONGITUDE,
+                    default=self.config_entry.options.get(
+                        CONF_LONGITUDE, self.hass.config.longitude
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=-180, max=180, step=0.000001, mode=NumberSelectorMode.BOX
+                    )
+                ),
+                vol.Optional(
+                    CONF_WATCHLIST_KEYWORDS,
+                    default=self.config_entry.options.get(
+                        CONF_WATCHLIST_KEYWORDS, DEFAULT_WATCHLIST_KEYWORDS
+                    ),
+                ): str,
+                vol.Optional(
+                    CONF_ALLERGENS,
+                    default=self.config_entry.options.get(
+                        CONF_ALLERGENS, DEFAULT_ALLERGENS
+                    ),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=ALLERGEN_LIST,
+                        multiple=True,
+                        mode=SelectSelectorMode.LIST,
+                        custom_value=True,
+                    )
+                ),
             }
         )
 
