@@ -89,9 +89,7 @@ class LuAlertOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                 ): bool,
                 vol.Optional(
                     CONF_LATITUDE,
-                    default=self.config_entry.options.get(
-                        CONF_LATITUDE, self.hass.config.latitude
-                    ),
+                    default=self.config_entry.options.get(CONF_LATITUDE),
                 ): NumberSelector(
                     NumberSelectorConfig(
                         min=-90, max=90, step=0.000001, mode=NumberSelectorMode.BOX
@@ -99,9 +97,7 @@ class LuAlertOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                 ),
                 vol.Optional(
                     CONF_LONGITUDE,
-                    default=self.config_entry.options.get(
-                        CONF_LONGITUDE, self.hass.config.longitude
-                    ),
+                    default=self.config_entry.options.get(CONF_LONGITUDE),
                 ): NumberSelector(
                     NumberSelectorConfig(
                         min=-180, max=180, step=0.000001, mode=NumberSelectorMode.BOX
