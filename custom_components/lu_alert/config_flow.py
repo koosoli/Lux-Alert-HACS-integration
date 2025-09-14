@@ -9,7 +9,23 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DOMAIN, CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+)
+
+from .const import (
+    DOMAIN,
+    CONF_MIN_SEVERITY,
+    DEFAULT_MIN_SEVERITY,
+    CONF_ENABLE_LOCATION_FILTER,
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    DEFAULT_ENABLE_LOCATION_FILTER,
+    CONF_WATCHLIST_KEYWORDS,
+    DEFAULT_WATCHLIST_KEYWORDS,
+)
 from .enums import Severity
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,12 +91,7 @@ class LuAlertOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                     default=self.config_entry.options.get(
                         CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
                     ),
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        options=SEVERITY_LEVELS,
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
+                ): vol.In(SEVERITY_LEVELS),
                 vol.Optional(
                     CONF_ENABLE_LOCATION_FILTER,
                     default=self.config_entry.options.get(
@@ -109,19 +120,6 @@ class LuAlertOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                         CONF_WATCHLIST_KEYWORDS, DEFAULT_WATCHLIST_KEYWORDS
                     ),
                 ): str,
-                vol.Optional(
-                    CONF_ALLERGENS,
-                    default=self.config_entry.options.get(
-                        CONF_ALLERGENS, DEFAULT_ALLERGENS
-                    ),
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        options=ALLERGEN_LIST,
-                        multiple=True,
-                        mode=SelectSelectorMode.LIST,
-                        custom_value=True,
-                    )
-                ),
             }
         )
 
