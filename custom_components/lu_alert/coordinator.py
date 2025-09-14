@@ -278,54 +278,54 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         processed_alerts.sort(key=lambda x: (x["severity_level"], x["sent_time"]), reverse=True)
 
         # --- New: Location Filtering ---
-        location_filter_enabled = self.config_entry.options.get(CONF_ENABLE_LOCATION_FILTER)
+        # location_filter_enabled = self.config_entry.options.get(CONF_ENABLE_LOCATION_FILTER)
 
-        if location_filter_enabled:
-            user_lat = self.config_entry.options.get(CONF_LATITUDE)
-            user_lon = self.config_entry.options.get(CONF_LONGITUDE)
+        # if location_filter_enabled:
+        #     user_lat = self.config_entry.options.get(CONF_LATITUDE)
+        #     user_lon = self.config_entry.options.get(CONF_LONGITUDE)
 
-            if user_lat is not None and user_lon is not None:
-                for alert in processed_alerts:
-                    # An alert is local if the user's point is in any of its polygons
-                    polygons = [
-                        area["polygon"]
-                        for area in alert.get("area", [])
-                        if area and area.get("polygon")
-                    ]
-                    alert["is_local"] = is_point_in_polygons(user_lat, user_lon, polygons) if polygons else False
-            else:
-                # If location isn't configured, mark all as not local
-                _LOGGER.warning("Location filter is enabled, but latitude/longitude are not configured in the integration options.")
-                for alert in processed_alerts:
-                    alert["is_local"] = False
-        else:
-            # If the filter is disabled, mark all as not local
-            for alert in processed_alerts:
-                alert["is_local"] = False
+        #     if user_lat is not None and user_lon is not None:
+        #         for alert in processed_alerts:
+        #             # An alert is local if the user's point is in any of its polygons
+        #             polygons = [
+        #                 area["polygon"]
+        #                 for area in alert.get("area", [])
+        #                 if area and area.get("polygon")
+        #             ]
+        #             alert["is_local"] = is_point_in_polygons(user_lat, user_lon, polygons) if polygons else False
+        #     else:
+        #         # If location isn't configured, mark all as not local
+        #         _LOGGER.warning("Location filter is enabled, but latitude/longitude are not configured in the integration options.")
+        #         for alert in processed_alerts:
+        #             alert["is_local"] = False
+        # else:
+        #     # If the filter is disabled, mark all as not local
+        #     for alert in processed_alerts:
+        #         alert["is_local"] = False
         # --- End Location Filtering ---
 
         # --- New: Allergen Matching ---
-        user_allergens = {
-            allergen.lower()
-            for allergen in self.config_entry.options.get(CONF_ALLERGENS, DEFAULT_ALLERGENS)
-        }
-        if user_allergens:
-            for alert in processed_alerts:
-                alert["allergen_match"] = False
-                # Combine all text fields where an allergen could be mentioned
-                search_text = (
-                    (alert.get("headline", "") or "")
-                    + " "
-                    + (alert.get("description", "") or "")
-                    + " "
-                    + (alert.get("event", "") or "")
-                ).lower()
+        # user_allergens = {
+        #     allergen.lower()
+        #     for allergen in self.config_entry.options.get(CONF_ALLERGENS, DEFAULT_ALLERGENS)
+        # }
+        # if user_allergens:
+        #     for alert in processed_alerts:
+        #         alert["allergen_match"] = False
+        #         # Combine all text fields where an allergen could be mentioned
+        #         search_text = (
+        #             (alert.get("headline", "") or "")
+        #             + " "
+        #             + (alert.get("description", "") or "")
+        #             + " "
+        #             + (alert.get("event", "") or "")
+        #         ).lower()
 
-                if any(allergen in search_text for allergen in user_allergens):
-                    alert["allergen_match"] = True
-        else:
-            for alert in processed_alerts:
-                alert["allergen_match"] = False
+        #         if any(allergen in search_text for allergen in user_allergens):
+        #             alert["allergen_match"] = True
+        # else:
+        #     for alert in processed_alerts:
+        #         alert["allergen_match"] = False
         # --- End Allergen Matching ---
 
 
