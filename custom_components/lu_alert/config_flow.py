@@ -9,7 +9,21 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DOMAIN, CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY, CONF_ENABLE_LOCATION_FILTER, DEFAULT_ENABLE_LOCATION_FILTER
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+)
+
+from .const import (
+    DOMAIN,
+    CONF_MIN_SEVERITY,
+    DEFAULT_MIN_SEVERITY,
+    CONF_ENABLE_LOCATION_FILTER,
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    DEFAULT_ENABLE_LOCATION_FILTER,
+)
 from .enums import Severity
 
 _LOGGER = logging.getLogger(__name__)
@@ -82,6 +96,22 @@ class LuAlertOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                         CONF_ENABLE_LOCATION_FILTER, DEFAULT_ENABLE_LOCATION_FILTER
                     ),
                 ): bool,
+                vol.Optional(
+                    CONF_LATITUDE,
+                    default=self.config_entry.options.get(CONF_LATITUDE),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=-90, max=90, step=0.000001, mode=NumberSelectorMode.BOX
+                    )
+                ),
+                vol.Optional(
+                    CONF_LONGITUDE,
+                    default=self.config_entry.options.get(CONF_LONGITUDE),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=-180, max=180, step=0.000001, mode=NumberSelectorMode.BOX
+                    )
+                ),
             }
         )
 

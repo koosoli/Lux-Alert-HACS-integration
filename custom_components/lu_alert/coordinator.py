@@ -278,12 +278,11 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         processed_alerts.sort(key=lambda x: (x["severity_level"], x["sent_time"]), reverse=True)
 
         # --- New: Location Filtering ---
-        location_filter_enabled = self.config_entry.options.get(
-            CONF_ENABLE_LOCATION_FILTER, DEFAULT_ENABLE_LOCATION_FILTER
-        )
+        location_filter_enabled = self.config_entry.options.get(CONF_ENABLE_LOCATION_FILTER)
+
         if location_filter_enabled:
-            user_lat = self.config_entry.options.get(CONF_LATITUDE, self.hass.config.latitude)
-            user_lon = self.config_entry.options.get(CONF_LONGITUDE, self.hass.config.longitude)
+            user_lat = self.config_entry.options.get(CONF_LATITUDE)
+            user_lon = self.config_entry.options.get(CONF_LONGITUDE)
 
             if user_lat is not None and user_lon is not None:
                 for alert in processed_alerts:
@@ -293,10 +292,11 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                         for area in alert.get("area", [])
                         if area and area.get("polygon")
                     ]
-                    alert["is_local"] = is_point_in_polygons(user_lat, user_lon, polygons)
+                    alert["is_local"] = is_point_in_polygons(user_lat, user_lon, polygons) if polygons else False
             else:
                 # If location isn't configured, mark all as not local
-                 for alert in processed_alerts:
+                _LOGGER.warning("Location filter is enabled, but latitude/longitude are not configured in the integration options.")
+                for alert in processed_alerts:
                     alert["is_local"] = False
         else:
             # If the filter is disabled, mark all as not local
