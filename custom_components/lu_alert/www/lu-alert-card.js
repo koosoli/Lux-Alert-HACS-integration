@@ -102,11 +102,11 @@ class LuAlertCard extends HTMLElement {
             }
             const leafletCss = document.createElement('link');
             leafletCss.rel = 'stylesheet';
-            leafletCss.href = 'https://unpkg.com/leaflet@1.9.3/dist/leaflet.css';
+            leafletCss.href = '/hacsfiles/lu_alert/leaflet.css';
             this.shadowRoot.appendChild(leafletCss);
 
             const leafletJs = document.createElement('script');
-            leafletJs.src = 'https://unpkg.com/leaflet@1.9.3/dist/leaflet.js';
+            leafletJs.src = '/hacsfiles/lu_alert/leaflet.js';
             leafletJs.onload = () => resolve();
             this.shadowRoot.appendChild(leafletJs);
         });

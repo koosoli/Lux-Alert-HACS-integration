@@ -9,7 +9,7 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import DOMAIN, CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
+from .const import DOMAIN, CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY, CONF_ENABLE_LOCATION_FILTER, DEFAULT_ENABLE_LOCATION_FILTER
 from .enums import Severity
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,6 +76,12 @@ class LuAlertOptionsFlowHandler(config_entries.OptionsFlowWithReload):
                         CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
                     ),
                 ): vol.In(SEVERITY_LEVELS),
+                vol.Optional(
+                    CONF_ENABLE_LOCATION_FILTER,
+                    default=self.config_entry.options.get(
+                        CONF_ENABLE_LOCATION_FILTER, DEFAULT_ENABLE_LOCATION_FILTER
+                    ),
+                ): bool,
             }
         )
 
