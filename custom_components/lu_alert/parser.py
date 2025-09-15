@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+import re
 from datetime import datetime
 from typing import List, Optional, Type, TypeVar
 from .models import Alert, Info, Area, Parameter
@@ -29,7 +30,8 @@ def _parse_html_description(html_string: Optional[str]) -> dict[str, str]:
 
     try:
         # Sanitize and wrap HTML to ensure it's parsable as XML
-        sanitized_html = html_string.replace("&nbsp;", " ").replace("<br>", "<br/>")
+        sanitized_html = html_string.replace("&nbsp;", " ").replace("<br>", "<br/>").replace("&", "&amp;")
+        sanitized_html = re.sub(r"<img([^>]+)>", r"<img\1/>", sanitized_html)
         root = ET.fromstring(f"<div>{sanitized_html}</div>")
     except ET.ParseError:
         return {}

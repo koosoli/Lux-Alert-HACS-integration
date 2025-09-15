@@ -159,8 +159,11 @@ class LuAlertIndexedSensor(LuAlertBaseSensor):
             severity = self.alert_data.get("severity", "No Severity")
             headline = self.alert_data.get("headline", "No Headline")
             structured_description = self.alert_data.get("structured_description", {})
-            reason = structured_description.get("reason", "No Description")
-            return f"severity level: {severity} - {headline} - Description of the alert Reason: {reason}"
+            reason = structured_description.get("reason", "")
+            if reason:
+                return f"{severity} - {headline} - Description: {reason}"
+            else:
+                return f"{severity} - {headline}"
         return "No Alert"
 
     @property

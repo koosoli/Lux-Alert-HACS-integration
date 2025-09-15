@@ -4,6 +4,7 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.frontend import async_register_lovelace_module, async_remove_lovelace_module
 
 from .const import DOMAIN
 from .coordinator import LuAlertDataUpdateCoordinator
@@ -30,21 +31,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Forward the setup to the sensor platform.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register the Lovelace card if it's not already registered
-    if "lovelace" in hass.data:
-        resources = hass.data["lovelace"].get("resources")
-        if resources:
-            card_url = f"/hacsfiles/{DOMAIN}/lu-alert-card.js"
-            if not any(res["url"] == card_url for res in resources.async_items()):
-                resources.async_create_item(
-                    {"res_type": "module", "url": card_url}
-                )
+    # Register the Lovelace card
+    await async_register_lovelace_module(
+        hass, f"/hacsfiles/{DOMAIN}/lu-alert-card.js", "module"
+    )
 
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    # Unregister the Lovelace card
+    await async_remove_lovelace_module(hass, f"/hacsfiles/{DOMAIN}/lu-alert-card.js")
+
     # This is called when the user removes the integration.
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
