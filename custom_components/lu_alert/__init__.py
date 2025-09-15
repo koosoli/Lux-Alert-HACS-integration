@@ -19,9 +19,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create the DataUpdateCoordinator.
     coordinator = LuAlertDataUpdateCoordinator(hass, entry)
 
-    # Add listener for options updates.
-    entry.async_on_unload(entry.add_update_listener(options_update_listener))
-
     # Fetch initial data so we have it when the sensors are set up.
     await coordinator.async_config_entry_first_refresh()
 
@@ -49,10 +46,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
-
-
-async def options_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Handle options update."""
-    # This is triggered when the user changes the options.
-    # We trigger a refresh of the coordinator to apply the new settings.
-    await hass.data[DOMAIN][entry.entry_id].async_request_refresh()
