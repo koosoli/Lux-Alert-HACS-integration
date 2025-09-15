@@ -154,16 +154,9 @@ class LuAlertIndexedSensor(LuAlertBaseSensor):
 
     @property
     def native_value(self) -> str:
-        """Return the formatted alert message."""
+        """Return the headline of the alert."""
         if self.alert_data:
-            severity = self.alert_data.get("severity", "No Severity")
-            headline = self.alert_data.get("headline", "No Headline")
-            structured_description = self.alert_data.get("structured_description", {})
-            reason = structured_description.get("reason", "")
-            if reason:
-                return f"{severity} - {headline} - Description: {reason}"
-            else:
-                return f"{severity} - {headline}"
+            return self.alert_data.get("headline", "No Headline")
         return "No Alert"
 
     @property
