@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="custom_components/lu_alert/brand/logo.png" width="150" />
+</p>
+
 # LU-Alert (Luxembourg) Integration for Home Assistant
 
 This is a custom integration for Home Assistant that provides alerts from the official Luxembourg government's [LU-Alert](https://www.lu-alert.lu/) system.

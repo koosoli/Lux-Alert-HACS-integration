@@ -2,7 +2,6 @@ import asyncio
 from unittest.mock import MagicMock
 
 from custom_components.lu_alert.coordinator import LuAlertDataUpdateCoordinator
-from custom_components.lu_alert.sensor import LuAlertDescriptionSensor, _strip_html
 
 async def main():
     """Test the coordinator."""
@@ -35,13 +34,6 @@ async def main():
             print(f"  Headline: {alert_data.get('headline')}")
             print(f"  Severity: {alert_data.get('severity')}")
             print(f"  Event: {alert_data.get('event')}")
-
-            # Test the description sensor
-            desc_sensor = LuAlertDescriptionSensor(coordinator, entry, i)
-            print(f"  Description (State): {desc_sensor.native_value}")
-            full_desc = desc_sensor.extra_state_attributes.get('full_description') if desc_sensor.extra_state_attributes else "Not Available"
-            print(f"  Description (Attribute): {full_desc}")
-
             print(f"  Sent: {alert_data.get('sent')}")
 
 if __name__ == "__main__":

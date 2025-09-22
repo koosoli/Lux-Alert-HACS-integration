@@ -1,9 +1,13 @@
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import List, Optional, Type, TypeVar
+import logging
+
 from .models import Alert, Info, Area, Parameter
 from .enums import Status, MsgType, Scope, Code, Category, Urgency, Severity, Certainty
 from .builder import CAP_XMLNS  # Reuse the namespace constant
+
+_LOGGER = logging.getLogger(__name__)
 
 # Generic TypeVar for Enum types
 T = TypeVar('T', bound='Enum')
@@ -61,7 +65,11 @@ def parse_xml(xml_string: str) -> List[Alert]:
         A list of Alert dataclass instances. Returns an empty list if no
         <alert> tags are found.
     """
-    root = ET.fromstring(xml_string)
+    try:
+        root = ET.fromstring(xml_string)
+    except ET.ParseError:
+        _LOGGER.warning("Failed to parse alert data as it is not valid XML. The data provider may have changed their format.")
+        return []
 
     # Dynamically extract the namespace from the root element's tag
     ns = ''
