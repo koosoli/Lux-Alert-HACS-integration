@@ -8,17 +8,16 @@ This is a custom integration for Home Assistant that provides alerts from the of
 
 It fetches data from the public data portal ([data.public.lu](https://data.public.lu/fr/datasets/alertes-du-systeme-lu-alert/)) and presents alerts in a powerful and flexible way, allowing you to build robust automations and dashboard views based on official government warnings.
 
-## ⚠️ Known Issues & Call for Help ⚠️
+## ⚠️ Status Update (v2.1.0) ⚠️
 
-**This integration is currently in a partially broken state. The core functionality of fetching alerts based on a minimum severity level is working, but several advanced features are disabled due to persistent errors.**
+**The core functionality of fetching alerts is now restored.**
 
-We would be incredibly grateful for any help from the community to fix the following:
+Version 2.1.0 fixes a major issue where the integration stopped working because it attempted to download too many historical alert files, leading to timeouts.
 
--   **Advanced Filtering:** The logic for filtering alerts by location, watchlist keywords, and allergens is currently commented out as it was causing the integration to fail.
--   **Dashboard Card:** The custom Lovelace card is not working. It fails to load resources and does not display alerts.
--   **Integration Thumbnail:** The logo for the integration does not display correctly in Home Assistant.
-
-If you have experience with Home Assistant custom integration development, please consider taking a look at the code to help resolve these issues. Your contributions would be much appreciated!
+Remaining known issues we're working on:
+-   **Advanced Filtering:** The logic for filtering alerts by location, watchlist keywords, and allergens is currently disabled while we refactor it for better stability.
+-   **Dashboard Card:** Some users report the custom Lovelace card fails to load correctly.
+-   **Integration Thumbnail:** The logo for the integration may not display correctly in some Home Assistant versions.
 
 ## Features
 
