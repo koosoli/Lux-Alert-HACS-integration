@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -115,6 +116,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
         self.config_entry = entry
+        self._semaphore = asyncio.Semaphore(10)
 
     @property
     def min_severity_level(self) -> int:
@@ -126,7 +128,11 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         return SEVERITY_ORDER.get(severity_str, 0)
 
     async def _async_update_data(self) -> dict:
-        """Fetch, process, and filter data from the LU-Alert feed."""
+        """Fetch, process, and filter data from the LU-Alert feed.
+
+        Note: We must download the XML files to check their severity level,
+        as the dataset metadata does not include this information.
+        """
         xml_urls = await self._get_all_alert_urls()
         if not xml_urls:
             _LOGGER.info("No alert XML URLs found.")
@@ -224,7 +230,10 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
             # Filter out test alerts
             is_test_alert = False
             for param in info.parameters:
-                if param.valueName == "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level" and param.value in TEST_ALERT_LEVELS:
+                if param.valueName in [
+                    "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level",
+                    "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-lu-level",
+                ] and param.value in TEST_ALERT_LEVELS:
                     is_test_alert = True
                     break
             if is_test_alert:
@@ -251,7 +260,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                     "certainty": info.certainty.value if info.certainty else "Not Provided",
                     "urgency": info.urgency.value if info.urgency else "Not Provided",
                     "sent": alert.sent.isoformat() if alert.sent else "Not Provided",
-                    "sent_time": alert.sent or datetime.min,
+                    "sent_time": alert.sent or datetime.min.replace(tzinfo=dt_util.UTC),
                     "expires": info.expires.isoformat() if info.expires else "Not Provided",
                     "web": info.web or "Not Provided",
                     "language": info.language or "Not Provided",
@@ -361,8 +370,12 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         # First, try to find the specific LU-Alert level parameter, as it's the most reliable.
         # Note: The official CAP-LU documentation specifies "cb-lu-level",
         # but the actual XML feed uses "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level".
+        # We check both to be safe.
         for param in info.parameters:
-            if param.valueName == "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level":
+            if param.valueName in [
+                "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level",
+                "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-lu-level",
+            ]:
                 severity = LEVEL_TO_SEVERITY.get(param.value)
                 if severity:
                     return severity
@@ -378,17 +391,20 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         urls = []
         try:
             async with async_timeout.timeout(10):
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(DATASET_API_URL) as response:
-                        response.raise_for_status()
-                        data = await response.json()
-                        if data and "resources" in data:
-                            # Process all available XML resources
-                            for resource in data["resources"]:
-                                if resource.get("format", "").lower() == "xml":
-                                    url = resource.get("url")
-                                    if url:
-                                        urls.append(url)
+                session = async_get_clientsession(self.hass)
+                async with session.get(DATASET_API_URL) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    if data and "resources" in data:
+                        # Process available XML resources, limited to 100 most recent
+                        xml_resources = [
+                            r for r in data["resources"]
+                            if r.get("format", "").lower() == "xml" and r.get("url")
+                        ]
+                        # Sort by last_modified descending (most recent first)
+                        xml_resources.sort(key=lambda x: x.get("last_modified", ""), reverse=True)
+                        for resource in xml_resources[:100]:
+                            urls.append(resource.get("url"))
             return urls
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.warning("Failed to get alert URLs: %s", err)
@@ -396,15 +412,16 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _fetch_xml_content(self, url: str) -> str | None:
         """Fetch the raw XML content from a given URL."""
-        try:
-            async with async_timeout.timeout(10):
-                async with aiohttp.ClientSession() as session:
+        async with self._semaphore:
+            try:
+                async with async_timeout.timeout(10):
+                    session = async_get_clientsession(self.hass)
                     async with session.get(url) as response:
                         response.raise_for_status()
                         return await response.text()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.warning("Failed to fetch XML content from %s: %s", url, err)
-            return None
+            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                _LOGGER.warning("Failed to fetch XML content from %s: %s", url, err)
+                return None
 
     def _get_default_state(self) -> dict:
         """Return a dictionary representing a clear/default state."""

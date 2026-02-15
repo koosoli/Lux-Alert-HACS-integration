@@ -1,5 +1,5 @@
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Type, TypeVar
 import logging
 
@@ -48,7 +48,10 @@ def _to_datetime(value: Optional[str]) -> Optional[datetime]:
         return None
     try:
         # datetime.fromisoformat is powerful and handles most W3C/ISO 8601 formats.
-        return datetime.fromisoformat(value)
+        dt = datetime.fromisoformat(value)
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
     except ValueError:
         return None
 
