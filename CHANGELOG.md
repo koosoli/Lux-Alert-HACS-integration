@@ -1,12 +1,21 @@
 # Changelog
 
-## [2.1.0] - 2026-02-11
+## [2.1.1] - 2026-02-14
 
-### Fixed
-- Fixed integration stopping working due to timeouts when fetching a large number of historical alert files.
-- Improved data fetching efficiency by limiting requests to the most recent 50 alert resources.
-- Optimized network usage by using Home Assistant's shared aiohttp session.
+### Changed
+- Improved resilience of alert fetching with concurrency control (semaphore).
+- Increased fetch limit to 100 most recent resources to ensure all active alerts are captured.
+- Refined severity detection to support a broader range of CAP-LU parameter names.
+- Fixed potential sorting issues with offset-naive and offset-aware datetimes.
+- Enhanced debug logging for easier troubleshooting.
+
+## [2.1.0] - 2026-02-11 (Reverted)
 
 ### Added
-- Added support for additional severity parameter names (`cb-eu-level`, `cb-lu-level`) for better compatibility.
-- Added more robust error handling and logging during the update process.
+- New deduplication logic to handle alert updates and cancellations correctly.
+- Support for `cb-eu-level` severity parameter used in recent alerts.
+
+### Changed
+- Optimized API fetching by limiting to the 50 most recent alerts to prevent timeouts.
+- Migrated to using a shared `aiohttp` session for improved performance.
+- Updated minimum Home Assistant version requirements.
