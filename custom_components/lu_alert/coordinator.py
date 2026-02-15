@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 from datetime import timedelta, datetime
 import asyncio
+
 import async_timeout
 import aiohttp
 
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import (
@@ -127,14 +127,13 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> dict:
         """Fetch, process, and filter data from the LU-Alert feed."""
-        session = async_get_clientsession(self.hass)
-        xml_urls = await self._get_all_alert_urls(session)
+        xml_urls = await self._get_all_alert_urls()
         if not xml_urls:
             _LOGGER.info("No alert XML URLs found.")
             return self._get_default_state()
 
         # Concurrently fetch all XML files to improve performance
-        fetch_tasks = [self._fetch_xml_content(session, url) for url in xml_urls]
+        fetch_tasks = [self._fetch_xml_content(url) for url in xml_urls]
         all_xml_contents = await asyncio.gather(*fetch_tasks)
 
         all_alerts = []
@@ -205,7 +204,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         ]
 
         now = dt_util.utcnow()
-        old_alert_threshold = now - timedelta(days=14)
+        fourteen_days_ago = now - timedelta(days=10)
         processed_alerts = []
         for alert in filtered_alerts:
             # Prefer English language info, fall back to the first available
@@ -218,7 +217,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                 continue
 
             # Filter out old alerts that have no expiration date (after 14 days)
-            if not info.expires and alert.sent and alert.sent < old_alert_threshold:
+            if not info.expires and alert.sent and alert.sent < fourteen_days_ago:
                 _LOGGER.debug(f"Filtering old, non-expiring alert: {alert.identifier}")
                 continue
 
@@ -363,11 +362,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         # Note: The official CAP-LU documentation specifies "cb-lu-level",
         # but the actual XML feed uses "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level".
         for param in info.parameters:
-            if param.valueName in (
-                "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level",
-                "cb-lu-level",
-                "cb-eu-level",
-            ):
+            if param.valueName == "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level":
                 severity = LEVEL_TO_SEVERITY.get(param.value)
                 if severity:
                     return severity
@@ -378,39 +373,37 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
 
         return Severity.UNKNOWN
 
-    async def _get_all_alert_urls(self, session: aiohttp.ClientSession) -> list[str]:
-        """Get the URLs of the most recent alert XMLs from the dataset API."""
+    async def _get_all_alert_urls(self) -> list[str]:
+        """Get the URLs of all alert XMLs from the dataset API."""
         urls = []
         try:
-            async with async_timeout.timeout(15):
-                async with session.get(DATASET_API_URL) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    if data and "resources" in data:
-                        # Resources are usually listed from newest to oldest.
-                        # We limit to the most recent 50 resources to avoid timeouts.
-                        xml_resources = [
-                            res for res in data["resources"]
-                            if res.get("format", "").lower() == "xml"
-                        ]
-                        for resource in xml_resources[:50]:
-                            url = resource.get("url")
-                            if url:
-                                urls.append(url)
+            async with async_timeout.timeout(10):
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(DATASET_API_URL) as response:
+                        response.raise_for_status()
+                        data = await response.json()
+                        if data and "resources" in data:
+                            # Process all available XML resources
+                            for resource in data["resources"]:
+                                if resource.get("format", "").lower() == "xml":
+                                    url = resource.get("url")
+                                    if url:
+                                        urls.append(url)
             return urls
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.warning("Failed to get alert URLs from %s: %s", DATASET_API_URL, err)
-            raise UpdateFailed(f"Failed to get alert URLs: {err}") from err
+            _LOGGER.warning("Failed to get alert URLs: %s", err)
+            return []
 
-    async def _fetch_xml_content(self, session: aiohttp.ClientSession, url: str) -> str | None:
+    async def _fetch_xml_content(self, url: str) -> str | None:
         """Fetch the raw XML content from a given URL."""
         try:
             async with async_timeout.timeout(10):
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    return await response.text()
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as response:
+                        response.raise_for_status()
+                        return await response.text()
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.debug("Failed to fetch XML content from %s: %s", url, err)
+            _LOGGER.warning("Failed to fetch XML content from %s: %s", url, err)
             return None
 
     def _get_default_state(self) -> dict:
