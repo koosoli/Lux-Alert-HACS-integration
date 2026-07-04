@@ -104,6 +104,39 @@ def _parse_references(references_str: str | None) -> list[str]:
     return identifiers
 
 
+def _as_utc(value: datetime | None) -> datetime | None:
+    """Return a timezone-aware UTC datetime."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=dt_util.UTC)
+    return value.astimezone(dt_util.UTC)
+
+
+def _latest_expiration(alert: Alert) -> datetime | None:
+    """Return the latest expiration found across all language info blocks."""
+    expirations = [
+        expiration
+        for expiration in (_as_utc(info.expires) for info in alert.info)
+        if expiration is not None
+    ]
+    return max(expirations) if expirations else None
+
+
+def _is_expired(alert: Alert, now: datetime) -> bool:
+    """Return whether an alert has expired."""
+    latest_expiration = _latest_expiration(alert)
+    return latest_expiration is not None and latest_expiration < _as_utc(now)
+
+
+def _is_stale_without_expiration(alert: Alert, cutoff: datetime) -> bool:
+    """Return whether a non-expiring alert is old enough to suppress."""
+    if _latest_expiration(alert) is not None:
+        return False
+    sent = _as_utc(alert.sent)
+    return sent is not None and sent < _as_utc(cutoff)
+
+
 class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
     """A coordinator to fetch, parse, and filter LU-Alert data."""
 
@@ -210,20 +243,23 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
         ]
 
         now = dt_util.utcnow()
-        fourteen_days_ago = now - timedelta(days=10)
+        old_non_expiring_cutoff = now - timedelta(days=10)
         processed_alerts = []
         for alert in filtered_alerts:
             # Prefer English language info, fall back to the first available
             info = next((i for i in alert.info if i.language and i.language.lower().startswith("en")),
                         alert.info[0])
 
-            # Filter out expired alerts
-            if info.expires and info.expires < now:
+            # Filter out expired alerts. Expiry is per info block in CAP, so
+            # use all language blocks instead of only the selected display text.
+            latest_expiration = _latest_expiration(alert)
+            display_expiration = info.expires or latest_expiration
+            if _is_expired(alert, now):
                 _LOGGER.debug(f"Filtering expired alert: {alert.identifier}")
                 continue
 
-            # Filter out old alerts that have no expiration date (after 14 days)
-            if not info.expires and alert.sent and alert.sent < fourteen_days_ago:
+            # Filter out old alerts only when the alert has no expiry at all.
+            if _is_stale_without_expiration(alert, old_non_expiring_cutoff):
                 _LOGGER.debug(f"Filtering old, non-expiring alert: {alert.identifier}")
                 continue
 
@@ -261,7 +297,7 @@ class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
                     "urgency": info.urgency.value if info.urgency else "Not Provided",
                     "sent": alert.sent.isoformat() if alert.sent else "Not Provided",
                     "sent_time": alert.sent or datetime.min.replace(tzinfo=dt_util.UTC),
-                    "expires": info.expires.isoformat() if info.expires else "Not Provided",
+                    "expires": display_expiration.isoformat() if display_expiration else "Not Provided",
                     "web": info.web or "Not Provided",
                     "language": info.language or "Not Provided",
                     "category": [c.value for c in info.category if c] or ["Not Provided"],
