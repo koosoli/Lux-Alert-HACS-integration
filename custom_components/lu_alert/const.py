@@ -36,7 +36,7 @@ LOCATION_MODES = (LOCATION_MODE_OFF, LOCATION_MODE_FLAG, LOCATION_MODE_ONLY)
 
 LANGUAGES = ("en", "de", "fr", "lb")
 
-DEFAULT_MIN_SEVERITY = "Unknown"
+DEFAULT_MIN_SEVERITY = "unknown"
 DEFAULT_LANGUAGE = "en"
 DEFAULT_LOCATION_MODE = LOCATION_MODE_OFF
 DEFAULT_WATCHLIST_KEYWORDS = ""
@@ -69,7 +69,7 @@ SEVERITIES = (EXTREME, SEVERE, MODERATE, MINOR, INFORMATION, UNKNOWN, TEST)
 # Higher is more severe. Test is below everything: it is shown only when a test is asked for.
 SEVERITY_RANK = {EXTREME: 4, SEVERE: 3, MODERATE: 2, MINOR: 1, INFORMATION: 0, UNKNOWN: -1, TEST: -2}
 # The choices of the option "Minimum severity"
-MIN_SEVERITY_CHOICES = (UNKNOWN, INFORMATION, MINOR, MODERATE, SEVERE, EXTREME)
+MIN_SEVERITY_CHOICES = ("unknown", "information", "minor", "moderate", "severe", "extreme")
 # The severities that make a "critical" alert
 CRITICAL_SEVERITIES = (EXTREME, SEVERE)
 
