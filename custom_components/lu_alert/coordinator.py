@@ -63,7 +63,7 @@ def filters_from_entry(hass: HomeAssistant, entry: ConfigEntry) -> Filters:
         location = (float(lat), float(lon)) if lat is not None and lon is not None else (
             hass.config.latitude, hass.config.longitude)
     return Filters(
-        min_rank=SEVERITY_RANK.get(config.get(CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY), SEVERITY_RANK[UNKNOWN]),
+        min_rank=SEVERITY_RANK.get(str(config.get(CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY)).capitalize(), SEVERITY_RANK[UNKNOWN]),
         language=language if language in LANGUAGES else DEFAULT_LANGUAGE,
         show_test=bool(config.get(CONF_SHOW_TEST, False)),
         stale_days=DEFAULT_STALE_DAYS,
