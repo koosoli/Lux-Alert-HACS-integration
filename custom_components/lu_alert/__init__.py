@@ -6,7 +6,11 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from homeassistant.components.frontend import add_extra_js_url, remove_extra_js_url
+from homeassistant.components.frontend import (
+    DATA_EXTRA_MODULE_URL,
+    add_extra_js_url,
+    remove_extra_js_url,
+)
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -52,8 +56,10 @@ async def async_setup_entry(
     elif hass.http is None:
         _LOGGER.warning("HTTP is not loaded; the LU-Alert dashboard card cannot be served yet")
 
-    add_extra_js_url(hass, CARD_MODULE_URL)
-    entry.async_on_unload(lambda: remove_extra_js_url(hass, CARD_MODULE_URL))
+    # The frontend component may not be loaded in headless installations or tests.
+    if DATA_EXTRA_MODULE_URL in hass.data:
+        add_extra_js_url(hass, CARD_MODULE_URL)
+        entry.async_on_unload(lambda: remove_extra_js_url(hass, CARD_MODULE_URL))
 
     await hass.config_entries.async_forward_entry_setups(
         entry, PLATFORMS

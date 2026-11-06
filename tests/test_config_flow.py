@@ -74,7 +74,7 @@ async def test_a_location_out_of_range_is_refused(hass: HomeAssistant, aioclient
     result = await hass.config_entries.options.async_init(entry.entry_id)
     try:
         await hass.config_entries.options.async_configure(
-            result["flow_id"], {"min_severity": "Unknown", "language": "en", "location_mode": "only", "latitude": 99,
+            result["flow_id"], {"min_severity": "unknown", "language": "en", "location_mode": "only", "latitude": 99,
                                 "longitude": 6, "show_test_alerts": False})
     except Exception as exc:                                                        # the schema rejects the answer
         assert "latitude" in str(exc) or "99" in str(exc) or "Invalid" in type(exc).__name__ or "expected" in str(exc)
