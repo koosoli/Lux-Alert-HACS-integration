@@ -1,0 +1,68 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "LU-Alert (Luxembourg)",
+        "description": "Alerts of the official Luxembourg LU-Alert system. More options (language, location, keywords, allergens) are in the options of the integration.",
+        "data": {
+          "min_severity": "Minimum severity"
+        },
+        "data_description": {
+          "min_severity": "Alerts below this level are ignored by the whole integration."
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "LU-Alert is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "LU-Alert options",
+        "data": {
+          "min_severity": "Minimum severity",
+          "language": "Language of the alert text",
+          "location_mode": "Location filter",
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "watchlist_keywords": "Watchlist keywords",
+          "allergens": "Allergens",
+          "show_test_alerts": "Show test alerts"
+        },
+        "data_description": {
+          "min_severity": "Alerts below this level are ignored by the whole integration.",
+          "language": "The language of the headline and description. Falls back to English, then to any language of the message.",
+          "location_mode": "\"Flag\" marks the alerts that cover your location. \"Only\" hides alerts that do not. An alert without any area is always kept.",
+          "latitude": "Leave latitude and longitude empty to use the location of your Home Assistant.",
+          "longitude": "Leave latitude and longitude empty to use the location of your Home Assistant.",
+          "watchlist_keywords": "Comma separated words. The \"Watchlist Match\" sensor is on while an alert mentions one of them (any language, headline, event, description or instruction).",
+          "allergens": "The \"Allergen Match\" sensor is on while an alert mentions one of them. Other words can be typed in.",
+          "show_test_alerts": "Test and exercise messages are shown with the severity \"Test\" instead of being left out."
+        }
+      }
+    },
+    "error": {
+      "location_incomplete": "Enter both latitude and longitude, or leave both empty."
+    }
+  },
+  "selector": {
+    "severity": {
+      "options": {
+        "Unknown": "All alerts (also without a severity)",
+        "Information": "Information",
+        "Minor": "Minor",
+        "Moderate": "Moderate",
+        "Severe": "Severe",
+        "Extreme": "Extreme"
+      }
+    },
+    "location_mode": {
+      "options": {
+        "off": "Off",
+        "flag": "Flag local alerts",
+        "only": "Only local alerts"
+      }
+    }
+  }
+}

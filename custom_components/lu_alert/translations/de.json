@@ -1,0 +1,68 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "LU-Alert (Luxemburg)",
+        "description": "Warnungen des offiziellen luxemburgischen LU-Alert-Systems. Weitere Optionen (Sprache, Standort, Stichwörter, Allergene) stehen in den Optionen der Integration.",
+        "data": {
+          "min_severity": "Mindestschweregrad"
+        },
+        "data_description": {
+          "min_severity": "Warnungen unterhalb dieser Stufe ignoriert die gesamte Integration."
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "LU-Alert ist bereits eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "LU-Alert-Optionen",
+        "data": {
+          "min_severity": "Mindestschweregrad",
+          "language": "Sprache des Warntextes",
+          "location_mode": "Standortfilter",
+          "latitude": "Breitengrad",
+          "longitude": "Längengrad",
+          "watchlist_keywords": "Stichwörter (Watchlist)",
+          "allergens": "Allergene",
+          "show_test_alerts": "Testwarnungen anzeigen"
+        },
+        "data_description": {
+          "min_severity": "Warnungen unterhalb dieser Stufe ignoriert die gesamte Integration.",
+          "language": "Sprache von Überschrift und Beschreibung. Ersatzweise Englisch, dann irgendeine Sprache der Meldung.",
+          "location_mode": "„Markieren“ kennzeichnet Warnungen, die deinen Standort betreffen. „Nur lokal“ blendet alle anderen aus. Eine Warnung ohne Gebietsangabe bleibt immer erhalten.",
+          "latitude": "Breiten- und Längengrad leer lassen, um den Standort von Home Assistant zu verwenden.",
+          "longitude": "Breiten- und Längengrad leer lassen, um den Standort von Home Assistant zu verwenden.",
+          "watchlist_keywords": "Kommagetrennte Wörter. Der Sensor „Watchlist Match“ ist an, solange eine Warnung eines davon erwähnt (jede Sprache; Überschrift, Ereignis, Beschreibung oder Anweisung).",
+          "allergens": "Der Sensor „Allergen Match“ ist an, solange eine Warnung eines davon erwähnt. Weitere Wörter können eingetippt werden.",
+          "show_test_alerts": "Test- und Übungsmeldungen werden mit dem Schweregrad „Test“ angezeigt, statt ausgeblendet zu werden."
+        }
+      }
+    },
+    "error": {
+      "location_incomplete": "Breiten- und Längengrad angeben oder beide leer lassen."
+    }
+  },
+  "selector": {
+    "severity": {
+      "options": {
+        "Unknown": "Alle Warnungen (auch ohne Schweregrad)",
+        "Information": "Information",
+        "Minor": "Gering",
+        "Moderate": "Mäßig",
+        "Severe": "Schwer",
+        "Extreme": "Extrem"
+      }
+    },
+    "location_mode": {
+      "options": {
+        "off": "Aus",
+        "flag": "Lokale Warnungen markieren",
+        "only": "Nur lokale Warnungen"
+      }
+    }
+  }
+}

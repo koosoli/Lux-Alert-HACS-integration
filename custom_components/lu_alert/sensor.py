@@ -1,169 +1,115 @@
 """Sensor platform for LU-Alert (Luxembourg)."""
 from __future__ import annotations
+
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.device_registry import DeviceInfo
 
-from .const import DOMAIN, DEFAULT_NAME, MAX_ALERTS
-from .coordinator import LuAlertDataUpdateCoordinator
+from .attributes import UNRECORDED, alert_attributes, snapshot_attributes
+from .const import DEFAULT_NAME, MAX_ALERTS, MAX_STATE_LENGTH, SEVERITIES
+from .coordinator import LuAlertCoordinator
+from .entity import LuAlertEntity
+from .util import shorten
+
+NO_ALERT = "None"
 
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the LU-Alert sensors from a config entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
-
-    sensors_to_add = [
-        LuAlertMainSensor(coordinator, entry),
-        LuAlertHighestSeveritySensor(coordinator, entry),
-    ]
-
-    for i in range(MAX_ALERTS):
-        sensors_to_add.append(LuAlertIndexedSensor(coordinator, entry, i))
-
-    async_add_entities(sensors_to_add)
+    coordinator: LuAlertCoordinator = entry.runtime_data
+    sensors: list[LuAlertEntity] = [LuAlertMainSensor(coordinator), LuAlertHighestSeveritySensor(coordinator)]
+    sensors.extend(LuAlertIndexedSensor(coordinator, index) for index in range(MAX_ALERTS))
+    async_add_entities(sensors)
 
 
-class LuAlertBaseSensor(CoordinatorEntity[LuAlertDataUpdateCoordinator], SensorEntity):
-    """Base class for LU-Alert sensors."""
-
-    _attr_has_entity_name = True
-
-    def __init__(
-        self, coordinator: LuAlertDataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
-        """Initialize the base sensor."""
-        super().__init__(coordinator)
-        self.entry = entry
-        self._attr_attribution = "Data provided by data.public.lu"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.entry.entry_id)},
-            name=DEFAULT_NAME,
-            manufacturer="Luxembourg Government",
-            model="LU-Alert",
-            entry_type="service",
-        )
-
-    @property
-    def available(self) -> bool:
-        """Return if the coordinator is available."""
-        return self.coordinator.last_update_success
-
-
-class LuAlertMainSensor(LuAlertBaseSensor):
-    """The main LU-Alert sensor, showing the number of active alerts."""
+class LuAlertMainSensor(LuAlertEntity, SensorEntity):
+    """The main LU-Alert sensor: the number of active alerts, with all of them in its attributes."""
 
     _attr_icon = "mdi:alert-decagram"
+    _attr_name = None                       # the main entity of the device: entity id sensor.lu_alert
+    _unrecorded_attributes = UNRECORDED
 
-    def __init__(
-        self, coordinator: LuAlertDataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
-        """Initialize the main sensor."""
-        super().__init__(coordinator, entry)
-        self._attr_unique_id = f"{self.entry.entry_id}_main"
-        self._attr_name = DEFAULT_NAME
+    def __init__(self, coordinator: LuAlertCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self._entry_id}_main"
 
     @property
     def native_value(self) -> int:
-        """Return the number of active alerts."""
-        return self.coordinator.data.get("count", 0) if self.coordinator.data else 0
+        return self.feed.snapshot.total if self.feed else 0
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return the state attributes, including the list of all alerts."""
-        if not self.coordinator.data:
+        if not self.feed:
             return {}
-
-        attrs = {}
-        counts = self.coordinator.data.get("severity_counts", {})
-        attrs["extreme_alerts"] = counts.get("extreme", 0)
-        attrs["severe_alerts"] = counts.get("severe", 0)
-        attrs["moderate_alerts"] = counts.get("moderate", 0)
-        attrs["minor_alerts"] = counts.get("minor", 0)
-        attrs["information_alerts"] = counts.get("information", 0)
-
-        highest_alert = self.coordinator.data.get("highest_severity_alert")
-        if highest_alert:
-            attrs["highest_severity_level"] = highest_alert.get("severity")
-            attrs["highest_severity_headline"] = highest_alert.get("headline")
-        else:
-            attrs["highest_severity_level"] = "None"
-            attrs["highest_severity_headline"] = "None"
-
-        attrs["alerts"] = self.coordinator.data.get("alerts", [])
-        return attrs
+        snapshot = self.feed.snapshot
+        counts = snapshot.counts
+        top = snapshot.alerts[0] if snapshot.alerts else None
+        return {
+            "extreme_alerts": counts.get("Extreme", 0),
+            "severe_alerts": counts.get("Severe", 0),
+            "moderate_alerts": counts.get("Moderate", 0),
+            "minor_alerts": counts.get("Minor", 0),
+            "information_alerts": counts.get("Information", 0),
+            "highest_severity_level": top.severity if top else NO_ALERT,
+            "highest_severity_headline": top.headline if top else NO_ALERT,
+            "next_expiry": snapshot.next_expiry.isoformat() if snapshot.next_expiry else None,
+            "alerts": snapshot_attributes(snapshot),
+        }
 
 
-class LuAlertHighestSeveritySensor(LuAlertBaseSensor):
-    """A sensor that shows the highest severity level currently active."""
+class LuAlertHighestSeveritySensor(LuAlertEntity, SensorEntity):
+    """The highest severity among the active alerts, with the details of that alert in its attributes."""
 
-    def __init__(
-        self, coordinator: LuAlertDataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
-        """Initialize the highest severity sensor."""
-        super().__init__(coordinator, entry)
-        self._attr_unique_id = f"{self.entry.entry_id}_highest_severity"
-        self._attr_name = f"{DEFAULT_NAME} Highest Severity"
+    _attr_name = "Highest severity"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [NO_ALERT, *SEVERITIES]
+    _unrecorded_attributes = UNRECORDED
+
+    def __init__(self, coordinator: LuAlertCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self._entry_id}_highest_severity"
 
     @property
     def native_value(self) -> str:
-        """Return the highest severity level of active alerts."""
-        if self.coordinator.data and self.coordinator.data.get("highest_severity_alert"):
-            return self.coordinator.data["highest_severity_alert"].get("severity", "None")
-        return "None"
+        if self.feed and self.feed.snapshot.alerts:
+            return self.feed.snapshot.alerts[0].severity
+        return NO_ALERT
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return attributes of the highest severity alert."""
-        if self.coordinator.data and self.coordinator.data.get("highest_severity_alert"):
-            return self.coordinator.data["highest_severity_alert"]
+        if self.feed and self.feed.snapshot.alerts:
+            return alert_attributes(self.feed.snapshot.alerts[0])
         return {}
 
 
-class LuAlertIndexedSensor(LuAlertBaseSensor):
-    """A sensor for a single alert, identified by its index."""
+class LuAlertIndexedSensor(LuAlertEntity, SensorEntity):
+    """One alert, by position: the state is the headline, the attributes are the rest."""
 
-    _attr_has_entity_name = False  # Override base class
+    _attr_has_entity_name = False           # the name is the whole name: entity id sensor.lu_alert_1
     _attr_icon = "mdi:alert-outline"
+    _unrecorded_attributes = UNRECORDED
 
-    def __init__(
-        self, coordinator: LuAlertDataUpdateCoordinator, entry: ConfigEntry, index: int
-    ) -> None:
-        """Initialize the indexed sensor."""
-        super().__init__(coordinator, entry)
+    def __init__(self, coordinator: LuAlertCoordinator, index: int) -> None:
+        super().__init__(coordinator)
         self.index = index
-        # The unique ID needs to be stable and unique
-        self._attr_unique_id = f"{self.entry.entry_id}_{index + 1}"
-        # Set the full friendly name. The entity ID will be derived from this.
+        self._attr_unique_id = f"{self._entry_id}_{index + 1}"
         self._attr_name = f"{DEFAULT_NAME} {index + 1}"
 
     @property
-    def alert_data(self) -> dict[str, Any] | None:
-        """Return the alert data for this sensor's index."""
-        if self.coordinator.data and len(self.coordinator.data.get("alerts", [])) > self.index:
-            return self.coordinator.data["alerts"][self.index]
-        return None
+    def _alert(self):
+        alerts = self.feed.snapshot.alerts if self.feed else ()
+        return alerts[self.index] if len(alerts) > self.index else None
 
     @property
     def native_value(self) -> str:
-        """Return the headline of the alert."""
-        if self.alert_data:
-            return self.alert_data.get("headline", "No Headline")
-        return "No Alert"
+        alert = self._alert
+        # a state is at most 255 characters; the full headline is in the attributes
+        return shorten(alert.headline, MAX_STATE_LENGTH) if alert else "No Alert"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return the rest of the alert data as attributes."""
-        if self.alert_data:
-            attrs = self.alert_data.copy()
-            attrs.pop("headline", None)
-            return attrs
-        return {}
+        alert = self._alert
+        return alert_attributes(alert) if alert else {}

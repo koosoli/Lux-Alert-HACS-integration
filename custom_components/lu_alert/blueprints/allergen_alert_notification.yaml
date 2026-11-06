@@ -1,7 +1,9 @@
 blueprint:
   name: LU-Alert Allergen Alert Notification
-  description: Sends a notification when a new LU-Alert is published that matches your configured allergen list.
+  description: Sends a notification when an LU-Alert that mentions one of your allergens becomes active (the sensor "Allergen Match" turns on).
   domain: automation
+  homeassistant:
+    min_version: 2024.10.0
   input:
     notification_device:
       name: Notification Device
@@ -9,22 +11,22 @@ blueprint:
       selector:
         device:
           integration: mobile_app
-
     notification_channel:
       name: Notification Channel (Optional)
-      description: The channel to send the notification to (e.g., "Alerts"). Requires the "channel" parameter in your notification service.
+      description: The Android notification channel to use (for example "Alerts"). Leave empty for the default channel.
       default: ""
 
-trigger:
-  - platform: state
+variables:
+  notification_channel: !input notification_channel
+
+triggers:
+  - trigger: state
     entity_id: binary_sensor.lu_alert_allergen_match
     to: "on"
 
-variables:
-  alerts: "{{ state_attr('sensor.lu_alert', 'alerts') }}"
-  allergen_alerts: "{{ alerts | selectattr('allergen_match', 'eq', true) | list }}"
-
-action:
+actions:
+  - variables:
+      allergen_alerts: "{{ state_attr('sensor.lu_alert', 'alerts') | selectattr('allergen_match', 'eq', true) | list }}"
   - repeat:
       for_each: "{{ allergen_alerts }}"
       sequence:
@@ -33,10 +35,5 @@ action:
           type: notify
           title: "⚠️ ALLERGEN ALERT: {{ repeat.item.event }}"
           message: "{{ repeat.item.headline }}"
-          data: >
-            {% set channel = notification_channel %}
-            {% if channel %}
-              { "channel": "{{ channel }}", "priority": "high" }
-            {% else %}
-              { "priority": "high" }
-            {% endif %}
+          data: >-
+            {{ {'channel': notification_channel, 'priority': 'high'} if notification_channel else {'priority': 'high'} }}

@@ -1,7 +1,9 @@
 blueprint:
   name: LU-Alert Critical Alert Notification
-  description: Sends a notification when a new critical (Severe or Extreme) LU-Alert is published.
+  description: Sends a notification when a Severe or Extreme LU-Alert becomes active (the sensor "Critical Alert Active" turns on).
   domain: automation
+  homeassistant:
+    min_version: 2024.10.0
   input:
     notification_device:
       name: Notification Device
@@ -9,34 +11,26 @@ blueprint:
       selector:
         device:
           integration: mobile_app
-
     notification_channel:
       name: Notification Channel (Optional)
-      description: The channel to send the notification to (e.g., "Alerts"). Requires the "channel" parameter in your notification service.
+      description: The Android notification channel to use (for example "Alerts"). Leave empty for the default channel.
       default: ""
 
-trigger:
-  - platform: state
-    entity_id: binary_sensor.lu_alert_critical_active
+variables:
+  notification_channel: !input notification_channel
+
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.lu_alert_critical_alert_active
     to: "on"
 
-variables:
-  highest_severity_sensor: "sensor.lu_alert_highest_severity"
-  headline: "{{ state_attr(highest_severity_sensor, 'headline') }}"
-  description: "{{ state_attr(highest_severity_sensor, 'description') }}"
-  severity: "{{ state_attr(highest_severity_sensor, 'severity') }}"
-  event: "{{ state_attr(highest_severity_sensor, 'event') }}"
-
-action:
+actions:
+  - variables:
+      alert: "{{ states.sensor.lu_alert_highest_severity.attributes }}"
   - device_id: !input notification_device
     domain: mobile_app
     type: notify
-    title: "🚨 CRITICAL ALERT: {{ severity }} - {{ event }}"
-    message: "{{ headline }}"
-    data: >
-      {% set channel = notification_channel %}
-      {% if channel %}
-        { "channel": "{{ channel }}", "priority": "high" }
-      {% else %}
-        { "priority": "high" }
-      {% endif %}
+    title: "🚨 CRITICAL ALERT: {{ alert.severity }} - {{ alert.event }}"
+    message: "{{ alert.headline }}"
+    data: >-
+      {{ {'channel': notification_channel, 'priority': 'high'} if notification_channel else {'priority': 'high'} }}

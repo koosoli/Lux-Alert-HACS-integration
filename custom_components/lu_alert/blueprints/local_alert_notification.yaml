@@ -1,7 +1,9 @@
 blueprint:
   name: LU-Alert Local Alert Notification
-  description: Sends a notification when a new LU-Alert is published that is relevant to your configured location.
+  description: Sends a notification when an LU-Alert that covers your location becomes active. Needs the location filter of the integration ("Flag local alerts" or "Only local alerts") to be on.
   domain: automation
+  homeassistant:
+    min_version: 2024.10.0
   input:
     notification_device:
       name: Notification Device
@@ -9,22 +11,22 @@ blueprint:
       selector:
         device:
           integration: mobile_app
-
     notification_channel:
       name: Notification Channel (Optional)
-      description: The channel to send the notification to (e.g., "Alerts"). Requires the "channel" parameter in your notification service.
+      description: The Android notification channel to use (for example "Alerts"). Leave empty for the default channel.
       default: ""
 
-trigger:
-  - platform: state
+variables:
+  notification_channel: !input notification_channel
+
+triggers:
+  - trigger: state
     entity_id: binary_sensor.lu_alert_local_alert_active
     to: "on"
 
-variables:
-  alerts: "{{ state_attr('sensor.lu_alert', 'alerts') }}"
-  local_alerts: "{{ alerts | selectattr('is_local', 'eq', true) | list }}"
-
-action:
+actions:
+  - variables:
+      local_alerts: "{{ state_attr('sensor.lu_alert', 'alerts') | selectattr('is_local', 'eq', true) | list }}"
   - repeat:
       for_each: "{{ local_alerts }}"
       sequence:
@@ -33,8 +35,5 @@ action:
           type: notify
           title: "📍 LOCAL ALERT: {{ repeat.item.severity }} - {{ repeat.item.event }}"
           message: "{{ repeat.item.headline }}"
-          data: >
-            {% set channel = notification_channel %}
-            {% if channel %}
-              { "channel": "{{ channel }}" }
-            {% endif %}
+          data: >-
+            {{ {'channel': notification_channel, 'priority': 'high'} if notification_channel else {'priority': 'high'} }}
