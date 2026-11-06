@@ -14,9 +14,9 @@ async def test_the_user_step_creates_the_entry(hass: HomeAssistant, aioclient_mo
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
     assert result["type"] is FlowResultType.FORM and result["step_id"] == "user"
 
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"min_severity": "Minor"})
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"min_severity": "minor"})
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "LU-Alert" and result["data"] == {"min_severity": "Minor"}
+    assert result["title"] == "LU-Alert" and result["data"] == {"min_severity": "minor"}
     await hass.async_block_till_done()
     [entry] = hass.config_entries.async_entries(DOMAIN)
     assert entry.state is ConfigEntryState.LOADED
@@ -36,7 +36,7 @@ async def test_the_options_flow_stores_every_option(hass: HomeAssistant, aioclie
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.FORM and result["step_id"] == "init"
-    options = {"min_severity": "Severe", "language": "de", "location_mode": "flag", "latitude": 49.6, "longitude": 6.1,
+    options = {"min_severity": "severe", "language": "de", "location_mode": "flag", "latitude": 49.6, "longitude": 6.1,
                "watchlist_keywords": "flood, storm", "allergens": ["Peanuts", "Kiwi"], "show_test_alerts": True}
     result = await hass.config_entries.options.async_configure(result["flow_id"], options)
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -52,7 +52,7 @@ async def test_the_options_form_starts_with_what_is_set(hass: HomeAssistant, aio
     result = await hass.config_entries.options.async_init(entry.entry_id)
     defaults = {str(key): key.default() for key in result["data_schema"].schema if key.default is not None
                 and callable(key.default) and key.default() is not None}
-    assert defaults["min_severity"] == "Moderate"                                   # from the data of the first set-up
+    assert defaults["min_severity"] == "moderate"                                   # from the data of the first set-up
     assert defaults["language"] == "fr"
     assert defaults["location_mode"] == "off"
 
@@ -62,7 +62,7 @@ async def test_half_a_location_is_refused(hass: HomeAssistant, aioclient_mock: A
     entry = await setup_entry(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"min_severity": "Unknown", "language": "en", "location_mode": "only", "latitude": 49.6,
+        result["flow_id"], {"min_severity": "unknown", "language": "en", "location_mode": "only", "latitude": 49.6,
                             "show_test_alerts": False})
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "location_incomplete"}

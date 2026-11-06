@@ -42,7 +42,7 @@ def alert(identifier: str, **kw) -> str:
 
 
 async def setup_entry(hass: HomeAssistant, options: dict | None = None, data: dict | None = None) -> MockConfigEntry:
-    entry = MockConfigEntry(domain=DOMAIN, data=data or {"min_severity": "Unknown"}, options=options or {},
+    entry = MockConfigEntry(domain=DOMAIN, data=data or {"min_severity": "unknown"}, options=options or {},
                             unique_id=DOMAIN)
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)

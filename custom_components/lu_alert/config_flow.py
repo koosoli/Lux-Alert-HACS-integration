@@ -67,8 +67,10 @@ class LuAlertOptionsFlow(OptionsFlow):
                 return self.async_create_entry(title="", data=user_input)
 
         current = {**self.config_entry.data, **self.config_entry.options} if user_input is None else user_input
+        # Older entries stored title-case values; selectors use the lower-case option keys.
+        severity_default = str(current.get(CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY)).lower()
         schema = vol.Schema({
-            vol.Required(CONF_MIN_SEVERITY, default=current.get(CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY)):
+            vol.Required(CONF_MIN_SEVERITY, default=severity_default):
                 SEVERITY_SELECTOR,
             vol.Required(CONF_LANGUAGE, default=current.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)): SelectSelector(
                 SelectSelectorConfig(options=LANGUAGE_OPTIONS, mode=SelectSelectorMode.DROPDOWN)),
