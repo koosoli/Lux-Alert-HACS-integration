@@ -5,6 +5,9 @@
     "http",
     "frontend"
   ],
+  "categories": [
+    "weather_alerts.public_warnings"
+  ],
   "codeowners": [
     "@janreimen"
   ],
@@ -16,8 +19,5 @@
   "issue_tracker": "https://github.com/janreimen/Lux-Alert-HACS-integration/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.1.0",
-  "categories": [
-    "weather_alerts.public_warnings"
-  ]
+  "version": "0.1.0"
 }
