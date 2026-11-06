@@ -74,4 +74,4 @@ Use GitHub issue templates for bugs and feature requests. Report vulnerabilities
 
 ## License
 
-The repository does not currently declare a license. Do not assume redistribution or relicensing rights until the maintainer adds one.
+This project is licensed under the **GNU General Public License v3.0 only (GPL-3.0-only)**. You may use, study, modify and redistribute the software under the terms of that license. If you distribute a modified or derivative version of the covered work, the GPL's corresponding-source and same-license requirements apply. See [LICENSE](LICENSE) for the complete license text.
