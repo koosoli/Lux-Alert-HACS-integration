@@ -49,12 +49,12 @@
   "selector": {
     "severity": {
       "options": {
-        "Unknown": "All alerts (also without a severity)",
-        "Information": "Information",
-        "Minor": "Minor",
-        "Moderate": "Moderate",
-        "Severe": "Severe",
-        "Extreme": "Extreme"
+        "unknown": "All alerts (also without a severity)",
+        "information": "Information",
+        "minor": "Minor",
+        "moderate": "Moderate",
+        "severe": "Severe",
+        "extreme": "Extreme"
       }
     },
     "location_mode": {
