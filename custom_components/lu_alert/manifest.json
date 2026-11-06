@@ -1,13 +1,23 @@
 {
   "domain": "lu_alert",
   "name": "LU-Alert (Luxembourg)",
-  "documentation": "https://github.com/koosoli/Lux-Alert-HACS-integration",
-  "issue_tracker": "https://github.com/koosoli/Lux-Alert-HACS-integration/issues",
-  "codeowners": ["@koosoli"],
-  "version": "2.0.0",
-  "iot_class": "cloud_polling",
+  "after_dependencies": [
+    "http",
+    "frontend"
+  ],
+  "categories": [
+    "weather_alerts.public_warnings"
+  ],
+  "codeowners": [
+    "@janreimen"
+  ],
   "config_flow": true,
   "dependencies": [],
-  "requirements": ["aiohttp", "shapely"],
-  "platforms": ["sensor", "binary_sensor"]
+  "documentation": "https://github.com/janreimen/Lux-Alert-HACS-integration",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/janreimen/Lux-Alert-HACS-integration/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
 }

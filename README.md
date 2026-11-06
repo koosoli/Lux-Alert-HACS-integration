@@ -1,119 +1,77 @@
-<p align="center">
-  <img src="custom_components/lu_alert/brand/logo.png" width="150" />
-</p>
+# LU-Alert — Home Assistant integration
 
-# LU-Alert (Luxembourg) Integration for Home Assistant
+[![Tests](https://github.com/janreimen/Lux-Alert-HACS-integration/actions/workflows/tests.yml/badge.svg)](https://github.com/janreimen/Lux-Alert-HACS-integration/actions/workflows/tests.yml)
+[![Validation](https://github.com/janreimen/Lux-Alert-HACS-integration/actions/workflows/validate.yml/badge.svg)](https://github.com/janreimen/Lux-Alert-HACS-integration/actions/workflows/validate.yml)
 
-This is a custom integration for Home Assistant that provides alerts from the official Luxembourg government's [LU-Alert](https://www.lu-alert.lu/) system.
+A Home Assistant custom integration for official Luxembourg LU-Alert warnings, using the public dataset published by [data.public.lu](https://data.public.lu/).
 
-It fetches data from the public data portal ([data.public.lu](https://data.public.lu/fr/datasets/alertes-du-systeme-lu-alert/)) and presents alerts in a powerful and flexible way, allowing you to build robust automations and dashboard views based on official government warnings.
+## Release target
 
-## ⚠️ Known Issues & Call for Help ⚠️
-
-**This integration is currently in a partially broken state. The core functionality of fetching alerts based on a minimum severity level is working, but several advanced features are disabled due to persistent errors.**
-
-We would be incredibly grateful for any help from the community to fix the following:
-
--   **Advanced Filtering:** The logic for filtering alerts by location, watchlist keywords, and allergens is currently commented out as it was causing the integration to fail.
--   **Dashboard Card:** The custom Lovelace card is not working. It fails to load resources and does not display alerts.
--   **Integration Thumbnail:** The logo for the integration does not display correctly in Home Assistant.
-
-If you have experience with Home Assistant custom integration development, please consider taking a look at the code to help resolve these issues. Your contributions would be much appreciated!
+**0.1.0** — initial maintained release line. Publish only after the release checks and manual smoke tests pass.
 
 ## Features
 
-- **Main Summary Sensor**: A primary sensor (`sensor.lu_alert`) that provides a count of active alerts and contains all alert details in its attributes.
-- **Indexed Sensors for Dashboards**: Simple sensors (`sensor.lu_alert_1`, `sensor.lu_alert_2`, etc.) where the state is the alert's headline, for easy display on dashboards.
-- **Critical Alert Binary Sensors**: Dedicated binary sensors (e.g., `binary_sensor.lu_alert_critical_alert_active`) that turn `on` for "Severe" or "Extreme" alerts, perfect for critical automations.
-- **Custom Lovelace Card**: A simple card to display the alerts on your dashboard.
-- **Single Device**: All entities are grouped under a single "LU-Alert" device to keep your entity list clean.
-- **Configurable Severity Filtering**: A dropdown menu in the configuration allows you to select the minimum severity of alerts you want the integration to process.
-- **UI-Based Configuration**: No YAML required. Add and configure the integration directly from the Home Assistant UI.
-- **Efficient Polling**: Uses a `DataUpdateCoordinator` to fetch data from the source API efficiently.
+- Retrieves CAP alert files from the LU-Alert public dataset.
+- Parses CAP messages, severity levels, language blocks, references, expiry times and geographic areas.
+- Supports minimum severity, language, test-message, location, watchlist keyword and allergen options.
+- Exposes summary, highest-severity and indexed alert sensors.
+- Exposes binary sensors for Extreme, Severe, Critical, Local, Watchlist, Allergen and feed connectivity states.
+- Uses a Home Assistant `DataUpdateCoordinator`, caches downloaded resources and retains last-known alerts during feed outages.
+- Includes a Lovelace alert card with optional area maps.
 
-## Installation
+This integration is not an emergency-notification guarantee. Continue to use official warning channels and follow emergency-service instructions.
 
-This integration is best installed via the [Home Assistant Community Store (HACS)](https://hacs.xyz/).
+## HACS installation
 
-1.  Ensure you have HACS installed.
-2.  Go to HACS > Integrations > and click the three dots in the top right.
-3.  Select "Custom repositories", add `https://github.com/koosoli/Lux-Alert-HACS-integration` as the repository URL, and select "Integration" as the category.
-4.  The "LU-Alert" integration will now be available in HACS. Click "Install".
-5.  Restart Home Assistant.
+1. Open HACS → Integrations.
+2. Add `https://github.com/janreimen/Lux-Alert-HACS-integration` as a custom repository if needed.
+3. Select **Integration**, install **LU-Alert**, then restart Home Assistant.
+4. Go to Settings → Devices & services → Add integration → **LU-Alert**.
+
+## Manual installation
+
+Copy `custom_components/lu_alert` into your Home Assistant `custom_components` directory and restart.
 
 ## Configuration
 
-1.  In Home Assistant, go to **Settings** > **Devices & Services**.
-2.  Click the **+ ADD INTEGRATION** button in the bottom right.
-3.  Search for **"LU-Alert"** and click on it.
-4.  You will be prompted to select a **minimum severity level**. Alerts below this level will be ignored by the entire integration. Select your desired level and click **Submit**.
-5.  To change the severity level later, go to the integration's card on the Devices & Services page and click **"Configure"**.
+Add the integration through the UI. Select the minimum severity during setup. Further options are available from the integration's **Configure** action:
 
-## Advanced Configuration
+- Preferred language.
+- Location filter: Off, flag local alerts, or only show local alerts.
+- Optional latitude and longitude override (both or neither).
+- Watchlist keywords separated by commas, semicolons or newlines.
+- Allergen terms.
+- Whether to show test/exercise alerts.
 
-In the integration's options, you can also configure the following advanced features:
+## Entities
 
-*   **Enable Location Filter**: When enabled, only alerts that are relevant to your Home Assistant's location will be shown. You can configure your Home Assistant's location in the General Configuration settings.
-*   **Latitude and Longitude**: If you want to use a different location than your Home Assistant's default, you can specify a custom latitude and longitude.
-*   **Watchlist Keywords**: You can specify a comma-separated list of keywords. Only alerts that contain one or more of these keywords in their headline or description will be shown.
-*   **Allergens**: You can select a list of allergens. Only alerts that are related to one or more of these allergens will be shown.
+The integration creates one LU-Alert device. Main sensors include `sensor.lu_alert`, `sensor.lu_alert_highest_severity` and indexed alert sensors `sensor.lu_alert_1` to `sensor.lu_alert_3`.
 
-## Dashboard Card
+Binary sensors cover Extreme, Severe, Critical, Local, Watchlist, Allergen and feed connection states. Entity IDs can be customised by Home Assistant's entity registry; verify actual IDs under Settings → Devices & services → Entities.
 
-This integration includes a custom Lovelace card (`lu-alert-card`) to display the alerts in a clean and organized way.
+## Lovelace card
 
-### Automatic Installation (HACS)
+The integration serves frontend assets from `/lu_alert_static/` and registers the card through its frontend setup. See `custom_components/lu_alert/www/lu-alert-card.js` for the current configuration options. After upgrades, restart Home Assistant and refresh the browser cache before adding any manual resource; avoid duplicate resource registrations.
 
-If you installed this integration via HACS, the card should be automatically registered with Home Assistant. You should be able to find the "Custom: LU-Alert Card" when you add a new card to your dashboard.
+## Data and privacy
 
-### Manual Installation
+The integration reads public data from data.public.lu. Its HTTP client enforces HTTPS, allowed-host and redirect validation, and response-size limits. No API credentials are required. Home Assistant coordinates are used only when location filtering is configured.
 
-If the card is not available automatically, you can register it manually:
-1.  Go to **Settings** > **Dashboards**.
-2.  Click the three dots (⋮) in the top-right corner and select **Resources**.
-3.  Click the **+ ADD RESOURCE** button.
-4.  Set the **URL** to `/hacsfiles/Lux-Alert-HACS-integration/lu-alert-card.js`.
-5.  Set the **Resource Type** to `JavaScript Module`.
-6.  Click **CREATE**.
+## Development
 
-## Available Entities
+See [CONTRIBUTING.md](CONTRIBUTING.md), [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), [docs/TESTING.md](docs/TESTING.md) and [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md).
 
-The integration provides a set of powerful entities to work with:
-
-### Main Entities
--   **`sensor.lu_alert`**: The main sensor. Its state is the total number of active alerts that match your filter. The attributes contain a full list of all alert data.
--   **`sensor.lu_alert_highest_severity`**: Shows the severity of the most critical active alert (e.g., "Minor", "Severe", or "None").
-
-### Indexed Sensors
-For easy display on dashboards, the integration creates sensors for the top alerts:
--   **`sensor.lu_alert_1`**, **`sensor.lu_alert_2`**, etc.
-    -   **State**: The headline of the alert.
-    -   **Attributes**: All other data for that alert (description, severity, sent time, etc.).
-    -   If no alert exists for that index, the state will be "No Alert".
-
-### Binary Sensors for Automation
-These are perfect for triggering automations for critical events:
--   **`binary_sensor.lu_alert_critical_alert_active`**: Turns `on` if there is any **Severe** OR **Extreme** alert.
--   **`binary_sensor.lu_alert_severe_alert_active`**: Turns `on` only for **Severe** alerts.
--   **`binary_sensor.lu_alert_extreme_alert_active`**: Turns `on` only for **Extreme** alerts.
-
-## Dashboard Example: Show Only Critical Alerts
-
-This is a powerful and recommended way to configure your dashboard. It will be completely hidden until a "Severe" or "Extreme" alert occurs, at which point it will appear with the alert details.
-
-Set the integration's "Minimum Severity" to "Information" to ensure it is aware of all alerts, then add this card to your dashboard:
-
-```yaml
-type: conditional
-conditions:
-  - entity: binary_sensor.lu_alert_critical_alert_active
-    state: 'on'
-card:
-  type: entities
-  title: 🚨 CRITICAL ALERT 🚨
-  entities:
-    - sensor.lu_alert_1
-    - sensor.lu_alert_2
-    - sensor.lu_alert_3
+```bash
+python3 -m pip install -r requirements_test.txt
+python3 -m compileall -q .
+python3 -m pytest -q
+ruff check custom_components tests
 ```
 
+## Support and security
+
+Use GitHub issue templates for bugs and feature requests. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). This community integration is not an official Luxembourg government support channel.
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0 only (GPL-3.0-only)**. You may use, study, modify and redistribute the software under the terms of that license. If you distribute a modified or derivative version of the covered work, the GPL's corresponding-source and same-license requirements apply. See [LICENSE](LICENSE) for the complete license text.

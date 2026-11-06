@@ -1,59 +1,91 @@
+
 """The LU-Alert (Luxembourg) integration."""
+
 from __future__ import annotations
 
+import logging
+from pathlib import Path
+
+from homeassistant.components.frontend import (
+    DATA_EXTRA_MODULE_URL,
+    add_extra_js_url,
+    remove_extra_js_url,
+)
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
-from .coordinator import LuAlertDataUpdateCoordinator
+from .const import CARD_FILE, DOMAIN, STATIC_URL
+from .coordinator import LuAlertCoordinator, filters_from_entry
 
-# List of platforms that this integration will create.
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
+_LOGGER = logging.getLogger(__name__)
+
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+]
+
+WWW_PATH = Path(__file__).parent / "www"
+CARD_MODULE_URL = f"{STATIC_URL}/{CARD_FILE}?v=0.1.0"
+STATIC_PATH_REGISTERED = f"{DOMAIN}_static_path_registered"
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry[LuAlertCoordinator],
+) -> bool:
     """Set up LU-Alert from a config entry."""
 
-    # Create the DataUpdateCoordinator.
-    coordinator = LuAlertDataUpdateCoordinator(hass, entry)
+    coordinator = LuAlertCoordinator(hass, entry)
+    entry.runtime_data = coordinator
 
-    # Add listener for options updates.
-    entry.async_on_unload(entry.add_update_listener(options_update_listener))
+    entry.async_on_unload(coordinator.async_shutdown)
+    entry.async_on_unload(
+        entry.add_update_listener(options_update_listener)
+    )
 
-    # Fetch initial data so we have it when the sensors are set up.
     await coordinator.async_config_entry_first_refresh()
 
-    # Store the coordinator so the sensors can access it.
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    # The static path survives a config-entry unload, so register it only once per HA run.
+    if hass.http is not None and not hass.data.get(STATIC_PATH_REGISTERED):
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(STATIC_URL, str(WWW_PATH), cache_headers=False)]
+        )
+        hass.data[STATIC_PATH_REGISTERED] = True
+    elif hass.http is None:
+        _LOGGER.warning("HTTP is not loaded; the LU-Alert dashboard card cannot be served yet")
 
-    # Forward the setup to the sensor platform.
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # The frontend component may not be loaded in headless installations or tests.
+    if DATA_EXTRA_MODULE_URL in hass.data:
+        add_extra_js_url(hass, CARD_MODULE_URL)
+        entry.async_on_unload(lambda: remove_extra_js_url(hass, CARD_MODULE_URL))
 
-    # Register the Lovelace card if it's not already registered
-    if "lovelace" in hass.data:
-        resources = hass.data["lovelace"].get("resources")
-        if resources:
-            card_url = f"/hacsfiles/{DOMAIN}/lu-alert-card.js"
-            if not any(res["url"] == card_url for res in resources.async_items()):
-                resources.async_create_item(
-                    {"res_type": "module", "url": card_url}
-                )
+    await hass.config_entries.async_forward_entry_setups(
+        entry, PLATFORMS
+    )
 
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
-    # This is called when the user removes the integration.
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
+async def async_unload_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry[LuAlertCoordinator],
+) -> bool:
+    """Unload LU-Alert."""
 
-    return unload_ok
+    return await hass.config_entries.async_unload_platforms(
+        entry, PLATFORMS
+    )
 
 
-async def options_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def options_update_listener(
+    hass: HomeAssistant,
+    entry: ConfigEntry[LuAlertCoordinator],
+) -> None:
     """Handle options update."""
-    # This is triggered when the user changes the options.
-    # We trigger a refresh of the coordinator to apply the new settings.
-    await hass.data[DOMAIN][entry.entry_id].async_request_refresh()
+
+    coordinator = entry.runtime_data
+    coordinator.filters = filters_from_entry(hass, entry)
+    await coordinator.async_request_refresh()
+

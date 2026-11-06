@@ -1,477 +1,199 @@
-"""DataUpdateCoordinator for the LU-Alert integration."""
-from __future__ import annotations
-import logging
-from datetime import timedelta, datetime
-import asyncio
+"""DataUpdateCoordinator for the LU-Alert integration: polls the feed, applies the rules, keeps the last known alerts.
 
-import async_timeout
-import aiohttp
+Error policy (the one of the Domoticz-LUAlert plugin):
+
+    * a failed poll NEVER clears the alerts: the entities keep showing the last known alerts, they still end when their
+      end time passes, and the "Feed connection" binary sensor turns off, so an outage is not mistaken for "all clear"
+    * the very first poll has nothing to fall back on: it fails, and Home Assistant retries the setup
+    * every problem is logged ONCE as a warning, repeats go to the debug log, and the recovery is logged once
+    * after a failed poll the next attempt waits longer (backoff, capped)
+"""
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field, replace
+from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import (
-    DataUpdateCoordinator,
-    UpdateFailed,
-)
+from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_track_point_in_utc_time
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .alerts import Filters, build_snapshot
+from .api import ApiError, Client
 from .const import (
-    DATASET_API_URL,
-    DOMAIN,
-    DEFAULT_SCAN_INTERVAL,
-    CONF_MIN_SEVERITY,
-    DEFAULT_MIN_SEVERITY,
-    CONF_ENABLE_LOCATION_FILTER,
-    CONF_LATITUDE,
-    CONF_LONGITUDE,
-    DEFAULT_ENABLE_LOCATION_FILTER,
-    CONF_ALLERGENS,
-    DEFAULT_ALLERGENS,
+    CONF_ALLERGENS, CONF_LANGUAGE, CONF_LOCATION_MODE, CONF_MIN_SEVERITY, CONF_SHOW_TEST, CONF_WATCHLIST_KEYWORDS,
+    DATASET_URL, DEFAULT_LANGUAGE, DEFAULT_LOCATION_MODE, DEFAULT_MAX_RESOURCES, DEFAULT_MIN_SEVERITY,
+    DEFAULT_SCAN_INTERVAL, DEFAULT_STALE_DAYS, DOMAIN, LANGUAGES, LOCATION_MODE_VALUES, MAX_BACKOFF, SEVERITY_RANK,
+    UNKNOWN,
 )
-from .parser import parse_xml
-from .utils import is_point_in_polygons
-from .enums import Severity, Category, MsgType
-from .models import Alert, Info
+from .feed import Feed, FeedResult
+from .model import CapAlert, Snapshot
+from .util import split_list
 
 _LOGGER = logging.getLogger(__name__)
 
-# Define the order of severity for filtering. Higher number is more severe.
-SEVERITY_ORDER = {
-    Severity.TEST.value: -2,
-    Severity.UNKNOWN.value: -1,
-    Severity.INFORMATION.value: 0,
-    Severity.MINOR.value: 1,
-    Severity.MODERATE.value: 2,
-    Severity.SEVERE.value: 3,
-    Severity.EXTREME.value: 4,
-}
 
-# Mapping from cb-lu-level parameter to Severity enum
-LEVEL_TO_SEVERITY = {
-    # Extreme
-    "N1": Severity.EXTREME,
-    "L1": Severity.EXTREME,
-    "D": Severity.EXTREME,
-    "LU-Alert Level 1": Severity.EXTREME,
-    "ALERT_LVL_1": Severity.EXTREME,
+@dataclass
+class LuAlertData:
+    """What the entities show."""
 
-    # Severe
-    "N2": Severity.SEVERE,
-    "L2": Severity.SEVERE,
-    "LU-Alert Level 2": Severity.SEVERE,
-    "ALERT_LVL_2": Severity.SEVERE,
-
-    # Moderate
-    "A": Severity.MODERATE,
-    "LU-Alert Amber": Severity.MODERATE,
-
-    # Minor
-    "N3": Severity.MINOR,
-    "L3": Severity.MINOR,
-    "LU-Alert Level 3": Severity.MINOR,
-    "ALERT_LVL_3": Severity.MINOR,
-
-    # Information
-    "I": Severity.INFORMATION,
-    "LU-Alert Level 4": Severity.INFORMATION,
-    "ALERT_LVL_4": Severity.INFORMATION,
-
-    # Test
-    "T": Severity.TEST,
-    "LU-Alert Test": Severity.TEST,
-    "LU-Alert Exercise": Severity.TEST,
-}
-
-# Set of alert levels that should be considered as "Test" and filtered out
-TEST_ALERT_LEVELS = {"T", "D", "LU-Alert Test", "LU-Alert Exercise"}
+    snapshot: Snapshot
+    feed_ok: bool = True                    # the last poll worked
+    last_success: datetime | None = None
+    last_error: str | None = None
+    listed: int = 0                         # alert files the dataset lists (within the limit)
+    fetched: int = 0                        # downloaded in the last poll
+    failed: int = 0                         # files that could not be read in the last poll
+    unreadable: int = 0                     # files that are not valid CAP
+    errors: list[str] = field(default_factory=list)
 
 
-def _parse_references(references_str: str | None) -> list[str]:
-    """Parse the references string into a list of alert identifiers."""
-    if not references_str:
-        return []
-
-    identifiers = []
-    # The string is space-separated, and each part is comma-separated.
-    parts = references_str.strip().split()
-    for part in parts:
-        # Each part is like "sender,identifier,sent_time"
-        sub_parts = part.split(',')
-        if len(sub_parts) > 1:
-            # The identifier is the second element
-            identifiers.append(sub_parts[1])
-    return identifiers
-
-
-def _as_utc(value: datetime | None) -> datetime | None:
-    """Return a timezone-aware UTC datetime."""
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=dt_util.UTC)
-    return value.astimezone(dt_util.UTC)
+def filters_from_entry(hass: HomeAssistant, entry: ConfigEntry) -> Filters:
+    """The filter rules of the options (and the data of the first setup). The location never goes into a log."""
+    config = {**entry.data, **entry.options}
+    language = str(config.get(CONF_LANGUAGE) or DEFAULT_LANGUAGE).lower()
+    location = None
+    mode = LOCATION_MODE_VALUES.get(config.get(CONF_LOCATION_MODE, DEFAULT_LOCATION_MODE), 0)
+    if mode:
+        lat, lon = config.get(CONF_LATITUDE), config.get(CONF_LONGITUDE)
+        location = (float(lat), float(lon)) if lat is not None and lon is not None else (
+            hass.config.latitude, hass.config.longitude)
+    return Filters(
+        min_rank=SEVERITY_RANK.get(str(config.get(CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY)).capitalize(), SEVERITY_RANK[UNKNOWN]),
+        language=language if language in LANGUAGES else DEFAULT_LANGUAGE,
+        show_test=bool(config.get(CONF_SHOW_TEST, False)),
+        stale_days=DEFAULT_STALE_DAYS,
+        location_mode=mode,
+        location=location,
+        keywords=tuple(k.lower() for k in split_list(config.get(CONF_WATCHLIST_KEYWORDS))),
+        allergens=tuple(a.lower() for a in (config.get(CONF_ALLERGENS) or []) if str(a).strip()),
+    )
 
 
-def _latest_expiration(alert: Alert) -> datetime | None:
-    """Return the latest expiration found across all language info blocks."""
-    expirations = [
-        expiration
-        for expiration in (_as_utc(info.expires) for info in alert.info)
-        if expiration is not None
-    ]
-    return max(expirations) if expirations else None
+class LuAlertCoordinator(DataUpdateCoordinator[LuAlertData]):
+    """Fetch, parse and filter the LU-Alert feed."""
 
+    config_entry: ConfigEntry
 
-def _is_expired(alert: Alert, now: datetime) -> bool:
-    """Return whether an alert has expired."""
-    latest_expiration = _latest_expiration(alert)
-    return latest_expiration is not None and latest_expiration < _as_utc(now)
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, client: Client | None = None) -> None:
+        super().__init__(hass, _LOGGER, config_entry=entry, name=DOMAIN,
+                         update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL))
+        self._client = client or Client(async_get_clientsession(hass), DATASET_URL)
+        self._feed = Feed(self._client, DEFAULT_MAX_RESOURCES, executor=hass.async_add_executor_job)
+        self.filters = filters_from_entry(hass, entry)
+        self._cap_alerts: list[CapAlert] = []
+        self._failures = 0
+        self._problems: set[str] = set()                # problems the log already told about
+        self._tests_told: set[str] = set()              # identifiers of test messages the log already named
+        self._levels_told: set[str] = set()             # level codes the log already called unknown
+        self._unsub_expiry: CALLBACK_TYPE | None = None
 
+    # -- life cycle -----------------------------------------------------------------------------------------
+    async def async_shutdown(self) -> None:
+        self._cancel_expiry()
+        await super().async_shutdown()
 
-def _is_stale_without_expiration(alert: Alert, cutoff: datetime) -> bool:
-    """Return whether a non-expiring alert is old enough to suppress."""
-    if _latest_expiration(alert) is not None:
-        return False
-    sent = _as_utc(alert.sent)
-    return sent is not None and sent < _as_utc(cutoff)
-
-
-class LuAlertDataUpdateCoordinator(DataUpdateCoordinator):
-    """A coordinator to fetch, parse, and filter LU-Alert data."""
-
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
-        """Initialize the coordinator."""
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=DOMAIN,
-            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
-        )
-        self.config_entry = entry
-        self._semaphore = asyncio.Semaphore(10)
-
-    @property
-    def min_severity_level(self) -> int:
-        """Get the minimum severity level from config options or data."""
-        # Prioritize options, but fall back to data for initial setup
-        severity_str = self.config_entry.options.get(CONF_MIN_SEVERITY) or self.config_entry.data.get(
-            CONF_MIN_SEVERITY, DEFAULT_MIN_SEVERITY
-        )
-        return SEVERITY_ORDER.get(severity_str, 0)
-
-    async def _async_update_data(self) -> dict:
-        """Fetch, process, and filter data from the LU-Alert feed.
-
-        Note: We must download the XML files to check their severity level,
-        as the dataset metadata does not include this information.
-        """
-        xml_urls = await self._get_all_alert_urls()
-        if not xml_urls:
-            _LOGGER.info("No alert XML URLs found.")
-            return self._get_default_state()
-
-        # Concurrently fetch all XML files to improve performance
-        fetch_tasks = [self._fetch_xml_content(url) for url in xml_urls]
-        all_xml_contents = await asyncio.gather(*fetch_tasks)
-
-        all_alerts = []
-        for i, xml_content in enumerate(all_xml_contents):
-            if not xml_content:
-                continue  # Skip failed downloads
-
-            try:
-                # Use hass.async_add_executor_job for the CPU-bound parsing
-                alerts_from_file = await self.hass.async_add_executor_job(
-                    parse_xml, xml_content
-                )
-                all_alerts.extend(alerts_from_file)
-            except Exception as err:
-                # Log the specific URL that failed to parse
-                _LOGGER.warning(f"Failed to parse alert XML from {xml_urls[i]}: {err}")
-
-        # --- Start of new deduplication logic ---
-        if not all_alerts:
-            return self._get_default_state()
-
-        # 1. Create a dictionary of alerts by ID, keeping the most recent one.
-        alerts_by_id: dict[str, Alert] = {}
-        for alert in all_alerts:
-            if not alert.identifier or not alert.sent:
-                continue
-            if (
-                alert.identifier not in alerts_by_id
-                or alert.sent > alerts_by_id[alert.identifier].sent
-            ):
-                alerts_by_id[alert.identifier] = alert
-
-        # 2. Identify all superseded or canceled alerts.
-        ids_to_remove = set()
-        for alert in alerts_by_id.values():
-            # If an alert is a cancellation, it should be removed.
-            if alert.msgType == MsgType.CANCEL:
-                ids_to_remove.add(alert.identifier)
-
-            # The alerts it refers to should also be removed.
-            if alert.references:
-                referenced_ids = _parse_references(alert.references)
-                for ref_id in referenced_ids:
-                    ids_to_remove.add(ref_id)
-
-        # 3. Create the final list of active, deduplicated alerts.
-        active_alerts = [
-            alert
-            for identifier, alert in alerts_by_id.items()
-            if identifier not in ids_to_remove
-        ]
-        # --- End of new deduplication logic ---
-
-        if not active_alerts:
-            return self._get_default_state()
-
-        # Filter for relevant alert categories
-        allowed_categories = {
-            Category.GEO, Category.MET, Category.SAFETY, Category.SECURITY,
-            Category.RESCUE, Category.FIRE, Category.ENV, Category.TRANSPORT,
-            Category.INFRA, Category.HEALTH
-        }
-
-        # Use `active_alerts` instead of `all_alerts`
-        filtered_alerts = [
-            alert for alert in active_alerts
-            if alert.info and any(cat in allowed_categories for cat in alert.info[0].category)
-        ]
-
-        now = dt_util.utcnow()
-        old_non_expiring_cutoff = now - timedelta(days=10)
-        processed_alerts = []
-        for alert in filtered_alerts:
-            # Prefer English language info, fall back to the first available
-            info = next((i for i in alert.info if i.language and i.language.lower().startswith("en")),
-                        alert.info[0])
-
-            # Filter out expired alerts. Expiry is per info block in CAP, so
-            # use all language blocks instead of only the selected display text.
-            latest_expiration = _latest_expiration(alert)
-            display_expiration = info.expires or latest_expiration
-            if _is_expired(alert, now):
-                _LOGGER.debug(f"Filtering expired alert: {alert.identifier}")
-                continue
-
-            # Filter out old alerts only when the alert has no expiry at all.
-            if _is_stale_without_expiration(alert, old_non_expiring_cutoff):
-                _LOGGER.debug(f"Filtering old, non-expiring alert: {alert.identifier}")
-                continue
-
-            # Filter out test alerts
-            is_test_alert = False
-            for param in info.parameters:
-                if param.valueName in [
-                    "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level",
-                    "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-lu-level",
-                ] and param.value in TEST_ALERT_LEVELS:
-                    is_test_alert = True
-                    break
-            if is_test_alert:
-                _LOGGER.debug(f"Filtering test alert: {alert.identifier}")
-                continue
-
-            severity_enum = self._get_severity(info)
-            alert_severity_str = severity_enum.value if severity_enum else Severity.UNKNOWN.value
-            alert_severity_level = SEVERITY_ORDER.get(alert_severity_str, 0)
-
-            # Filter based on the user's configuration for minimum severity
-            if alert_severity_level >= self.min_severity_level:
-                processed_alerts.append({
-                    "identifier": alert.identifier or "Not Provided",
-                    "headline": info.headline or "Not Provided",
-                    "description": info.description or "Not Provided",
-                    "instruction": info.instruction or "Not Provided",
-                    "severity_level": alert_severity_level,
-                    "severity": alert_severity_str,
-                    "status": alert.status.value if alert.status else "Not Provided",
-                    "msgType": alert.msgType.value if alert.msgType else "Not Provided",
-                    "event": info.event or "Not Provided",
-                    "senderName": info.senderName or "Not Provided",
-                    "certainty": info.certainty.value if info.certainty else "Not Provided",
-                    "urgency": info.urgency.value if info.urgency else "Not Provided",
-                    "sent": alert.sent.isoformat() if alert.sent else "Not Provided",
-                    "sent_time": alert.sent or datetime.min.replace(tzinfo=dt_util.UTC),
-                    "expires": display_expiration.isoformat() if display_expiration else "Not Provided",
-                    "web": info.web or "Not Provided",
-                    "language": info.language or "Not Provided",
-                    "category": [c.value for c in info.category if c] or ["Not Provided"],
-                    "effective": info.effective.isoformat() if info.effective else "Not Provided",
-                    "area": [
-                        {
-                            "areaDesc": a.areaDesc,
-                            "polygon": a.polygon,
-                            "circle": a.circle,
-                            "geocode": a.geocode,
-                        }
-                        for a in info.area
-                    ] or ["Not Provided"],
-                    "sender": alert.sender or "Not Provided",
-                    "scope": alert.scope.value if alert.scope else "Not Provided",
-                    "code": [c.value for c in alert.code if c] or ["Not Provided"],
-                    "note": alert.note or "Not Provided",
-                    "references": alert.references or "Not Provided",
-                    "structured_description": info.structured_description or {},
-                })
-
-        # Sort alerts by severity (desc) and then by sent time (desc)
-        processed_alerts.sort(key=lambda x: (x["severity_level"], x["sent_time"]), reverse=True)
-
-        # --- New: Location Filtering ---
-        # location_filter_enabled = self.config_entry.options.get(CONF_ENABLE_LOCATION_FILTER)
-
-        # if location_filter_enabled:
-        #     user_lat = self.config_entry.options.get(CONF_LATITUDE)
-        #     user_lon = self.config_entry.options.get(CONF_LONGITUDE)
-
-        #     if user_lat is not None and user_lon is not None:
-        #         for alert in processed_alerts:
-        #             # An alert is local if the user's point is in any of its polygons
-        #             polygons = [
-        #                 area["polygon"]
-        #                 for area in alert.get("area", [])
-        #                 if area and area.get("polygon")
-        #             ]
-        #             alert["is_local"] = is_point_in_polygons(user_lat, user_lon, polygons) if polygons else False
-        #     else:
-        #         # If location isn't configured, mark all as not local
-        #         _LOGGER.warning("Location filter is enabled, but latitude/longitude are not configured in the integration options.")
-        #         for alert in processed_alerts:
-        #             alert["is_local"] = False
-        # else:
-        #     # If the filter is disabled, mark all as not local
-        #     for alert in processed_alerts:
-        #         alert["is_local"] = False
-        # --- End Location Filtering ---
-
-        # --- New: Allergen Matching ---
-        # user_allergens = {
-        #     allergen.lower()
-        #     for allergen in self.config_entry.options.get(CONF_ALLERGENS, DEFAULT_ALLERGENS)
-        # }
-        # if user_allergens:
-        #     for alert in processed_alerts:
-        #         alert["allergen_match"] = False
-        #         # Combine all text fields where an allergen could be mentioned
-        #         search_text = (
-        #             (alert.get("headline", "") or "")
-        #             + " "
-        #             + (alert.get("description", "") or "")
-        #             + " "
-        #             + (alert.get("event", "") or "")
-        #         ).lower()
-
-        #         if any(allergen in search_text for allergen in user_allergens):
-        #             alert["allergen_match"] = True
-        # else:
-        #     for alert in processed_alerts:
-        #         alert["allergen_match"] = False
-        # --- End Allergen Matching ---
-
-
-        # Count alerts by severity
-        severity_counts = {
-            "extreme": 0,
-            "severe": 0,
-            "moderate": 0,
-            "minor": 0,
-            "information": 0,
-            "unknown": 0,
-            "test": 0,
-        }
-        for alert in processed_alerts:
-            severity_key = alert["severity"].lower()
-            if severity_key in severity_counts:
-                severity_counts[severity_key] += 1
-
-        # Determine highest severity alert
-        highest_severity_alert = None
-        if processed_alerts:
-            highest_severity_alert = processed_alerts[0]
-
-        return {
-            "count": len(processed_alerts),
-            "alerts": processed_alerts,
-            "severity_counts": severity_counts,
-            "highest_severity_alert": highest_severity_alert,
-        }
-
-    def _get_severity(self, info: Info) -> Severity:
-        """Determine the severity of an alert, prioritizing the parameter code."""
-        # First, try to find the specific LU-Alert level parameter, as it's the most reliable.
-        # Note: The official CAP-LU documentation specifies "cb-lu-level",
-        # but the actual XML feed uses "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level".
-        # We check both to be safe.
-        for param in info.parameters:
-            if param.valueName in [
-                "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-eu-level",
-                "urn:oasis:names:tc:emergency:cap:1.2:profile:cap-lu:1.0:cb-lu-level",
-            ]:
-                severity = LEVEL_TO_SEVERITY.get(param.value)
-                if severity:
-                    return severity
-
-        # If no specific parameter is found, fall back to the direct severity field.
-        if info.severity:
-            return info.severity
-
-        return Severity.UNKNOWN
-
-    async def _get_all_alert_urls(self) -> list[str]:
-        """Get the URLs of all alert XMLs from the dataset API."""
-        urls = []
+    # -- polling --------------------------------------------------------------------------------------------
+    async def _async_update_data(self) -> LuAlertData:
         try:
-            async with async_timeout.timeout(10):
-                session = async_get_clientsession(self.hass)
-                async with session.get(DATASET_API_URL) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    if data and "resources" in data:
-                        # Process available XML resources, limited to 100 most recent
-                        xml_resources = [
-                            r for r in data["resources"]
-                            if r.get("format", "").lower() == "xml" and r.get("url")
-                        ]
-                        # Sort by last_modified descending (most recent first)
-                        xml_resources.sort(key=lambda x: x.get("last_modified", ""), reverse=True)
-                        for resource in xml_resources[:100]:
-                            urls.append(resource.get("url"))
-            return urls
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            _LOGGER.warning("Failed to get alert URLs: %s", err)
-            return []
+            result = await self._feed.refresh()
+        except ApiError as exc:
+            return self._poll_failed(exc)
+        return self._poll_worked(result)
 
-    async def _fetch_xml_content(self, url: str) -> str | None:
-        """Fetch the raw XML content from a given URL."""
-        async with self._semaphore:
-            try:
-                async with async_timeout.timeout(10):
-                    session = async_get_clientsession(self.hass)
-                    async with session.get(url) as response:
-                        response.raise_for_status()
-                        return await response.text()
-            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-                _LOGGER.warning("Failed to fetch XML content from %s: %s", url, err)
-                return None
+    def _poll_worked(self, result: FeedResult) -> LuAlertData:
+        self._failures = 0
+        self.update_interval = timedelta(seconds=DEFAULT_SCAN_INTERVAL)
+        if self._recovered("feed"):
+            _LOGGER.info("The LU-Alert feed answers again")
+        self._cap_alerts = result.cap_alerts
+        snapshot = self._build()
 
-    def _get_default_state(self) -> dict:
-        """Return a dictionary representing a clear/default state."""
-        return {
-            "count": 0,
-            "alerts": [],
-            "severity_counts": {
-                "extreme": 0,
-                "severe": 0,
-                "moderate": 0,
-                "minor": 0,
-                "information": 0,
-                "unknown": 0,
-                "test": 0,
-            },
-            "highest_severity_alert": None,
-        }
+        if result.failed:
+            self._report("files", "Could not read %d of %d alert files (%s): the alerts shown may be incomplete, the "
+                         "next poll tries again" % (result.failed, result.listed, _short(result.errors)))
+        elif self._recovered("files"):
+            _LOGGER.info("All alert files can be read again")
+        if result.unreadable:
+            self._report("unreadable", "%d alert file(s) are not valid CAP or too large and are ignored (%s)"
+                         % (result.unreadable, _short(result.errors)))
+        elif self._recovered("unreadable"):
+            _LOGGER.info("No alert file is unreadable any more")
+
+        return LuAlertData(snapshot, True, dt_util.utcnow(), None, result.listed, result.fetched, result.failed,
+                           result.unreadable, result.errors)
+
+    def _poll_failed(self, exc: ApiError) -> LuAlertData:
+        self._failures += 1
+        interval = DEFAULT_SCAN_INTERVAL
+        delay = max(interval, min(interval * 2 ** min(self._failures - 1, 6), MAX_BACKOFF))
+        if self.data is None:
+            # the first poll: there are no last known alerts to show, so Home Assistant retries the setup
+            raise UpdateFailed("LU-Alert feed poll failed: %s" % exc) from exc
+        self.update_interval = timedelta(seconds=delay)
+        self._report("feed", "LU-Alert feed poll failed: %s. The entities keep the last known alerts, the next "
+                     "attempt is in %d s" % (exc, delay))
+        return replace(self.data, snapshot=self._build(), feed_ok=False, last_error=str(exc), fetched=0)
+
+    # -- the rules ------------------------------------------------------------------------------------------
+    def _build(self) -> Snapshot:
+        """Apply the rules to the messages read so far, now. Also the place that plans the next expiry."""
+        snapshot = build_snapshot(self._cap_alerts, dt_util.utcnow(), self.filters)
+        for identifier, level, headline in snapshot.ignored_tests:
+            if identifier not in self._tests_told:
+                self._tests_told.add(identifier)
+                _LOGGER.info("Test message ignored (%s): %s", level, headline)
+        for level in snapshot.unknown_levels:
+            if level not in self._levels_told:
+                self._levels_told.add(level)
+                _LOGGER.warning("Unknown LU-Alert level '%s': the CAP severity of the message is used. The level table "
+                                "may need a new entry", level)
+        if snapshot.dropped:
+            _LOGGER.debug("Left out: %s", ", ".join("%s %d" % (k, v) for k, v in sorted(snapshot.dropped.items())))
+        self._schedule_expiry(snapshot.next_expiry)
+        return snapshot
+
+    # -- alerts end on time, also between polls --------------------------------------------------------------
+    def _cancel_expiry(self) -> None:
+        if self._unsub_expiry is not None:
+            self._unsub_expiry()
+            self._unsub_expiry = None
+
+    def _schedule_expiry(self, moment: datetime | None) -> None:
+        self._cancel_expiry()
+        if moment is None or self._shutdown_requested:
+            return
+        self._unsub_expiry = async_track_point_in_utc_time(
+            self.hass, self._handle_expiry, dt_util.as_utc(moment) + timedelta(seconds=1))
+
+    @callback
+    def _handle_expiry(self, _now: datetime) -> None:
+        """An alert has ended: show the alerts that are left, without polling (and without moving the next poll)."""
+        self._unsub_expiry = None
+        if self.data is None:
+            return
+        self.data = replace(self.data, snapshot=self._build())
+        self.async_update_listeners()
+
+    # -- log once -------------------------------------------------------------------------------------------
+    def _report(self, key: str, text: str) -> None:
+        if key in self._problems:
+            _LOGGER.debug(text)
+        else:
+            self._problems.add(key)
+            _LOGGER.warning(text)
+
+    def _recovered(self, key: str) -> bool:
+        if key in self._problems:
+            self._problems.discard(key)
+            return True
+        return False
+
+
+def _short(errors: list[str], limit: int = 150) -> str:
+    text = errors[0] if errors else "see the debug log"
+    return text if len(text) <= limit else text[: limit - 3] + "..."

@@ -1,40 +1,5 @@
-import asyncio
-from unittest.mock import MagicMock
+"""Retired manual coordinator smoke test.
 
-from custom_components.lu_alert.coordinator import LuAlertDataUpdateCoordinator
-
-async def main():
-    """Test the coordinator."""
-    hass = MagicMock()
-    entry = MagicMock()
-
-    # Set up the config entry mock
-    entry.options = {}
-
-    # Set up the hass mock for async_add_executor_job
-    async def dummy_async_add_executor_job(func, *args):
-        return func(*args)
-
-    hass.async_add_executor_job = dummy_async_add_executor_job
-
-
-    coordinator = LuAlertDataUpdateCoordinator(hass, entry)
-    await coordinator.async_refresh()
-
-    print("--- Coordinator Data ---")
-    print(coordinator.data)
-
-    print("\n--- Fetched Data ---")
-    data = coordinator.data
-    if data:
-        print(f"Headline: {data.get('headline')}")
-        print(f"Count: {data.get('count')}")
-        for i, alert_data in enumerate(data.get('alerts', [])):
-            print("--- Alert ---")
-            print(f"  Headline: {alert_data.get('headline')}")
-            print(f"  Severity: {alert_data.get('severity')}")
-            print(f"  Event: {alert_data.get('event')}")
-            print(f"  Sent: {alert_data.get('sent')}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
+Coordinator tests should live in the pytest suite and mock external feed access.
+This legacy entry point is intentionally kept as a valid, non-executable module.
+"""

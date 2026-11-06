@@ -1,0 +1,30 @@
+name: Home Assistant and HACS validation
+
+on:
+  push:
+    branches: [development, "feat/cap-lu-integration"]
+  pull_request:
+    branches: [development, "feat/cap-lu-integration"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hassfest:
+    name: Home Assistant hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run hassfest
+        uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate HACS
+        uses: hacs/action@main
+        with:
+          category: integration
