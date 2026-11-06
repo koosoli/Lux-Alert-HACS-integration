@@ -1,6 +1,6 @@
 """The HTTP client: https only, only the portal's own hosts, size limits, redirects, conditional requests."""
+import aiohttp
 import pytest
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.lu_alert import api
@@ -11,8 +11,17 @@ FILE = "https://data.public.lu/f/a.xml"
 
 
 @pytest.fixture
-def client(hass, aioclient_mock):
-    return Client(async_get_clientsession(hass), DATASET_URL)
+async def client(aioclient_mock: AiohttpClientMocker):
+    """Use a test-owned session so its resolver can be shut down deterministically."""
+    connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
+    session = aiohttp.ClientSession(connector=connector)
+    # Match the test utility's create_session() behavior without using HA's
+    # shared session (which uses the optional aiodns/pycares resolver).
+    object.__setattr__(session, "_request", aioclient_mock.match_request)
+    try:
+        yield Client(session, DATASET_URL)
+    finally:
+        await session.close()
 
 
 async def test_the_listing_is_newest_first_and_only_xml(client, aioclient_mock: AiohttpClientMocker):
