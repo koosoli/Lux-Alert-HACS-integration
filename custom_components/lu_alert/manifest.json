@@ -1,8 +1,13 @@
 {
   "domain": "lu_alert",
   "name": "LU-Alert (Luxembourg)",
-  "after_dependencies": ["http", "frontend"],
-  "codeowners": ["@janreimen"],
+  "after_dependencies": [
+    "http",
+    "frontend"
+  ],
+  "codeowners": [
+    "@janreimen"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/janreimen/Lux-Alert-HACS-integration",
@@ -11,5 +16,8 @@
   "issue_tracker": "https://github.com/janreimen/Lux-Alert-HACS-integration/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "categories": [
+    "weather.alerts"
+  ]
 }
