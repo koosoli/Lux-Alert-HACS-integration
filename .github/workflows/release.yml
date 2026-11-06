@@ -1,0 +1,33 @@
+name: Publish GitHub Release
+
+on:
+  push:
+    tags:
+      - "0.*"
+      - "1.*"
+      - "2.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify manifest version matches tag
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="$(python -c 'import json; print(json.load(open("custom_components/lu_alert/manifest.json"))["version"])')"
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Tag $TAG does not match manifest version $VERSION"
+            exit 1
+          fi
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${GITHUB_REF_NAME}" --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"
