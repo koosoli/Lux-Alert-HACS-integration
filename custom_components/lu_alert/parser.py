@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from enum import Enum
 from typing import List, Optional, Type, TypeVar
 import logging
 
