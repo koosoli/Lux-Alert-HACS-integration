@@ -18,6 +18,6 @@
   "single_config_entry": true,
   "version": "0.1.0",
   "categories": [
-    "weather.alerts"
+    "weather_alerts.public_warnings"
   ]
 }
