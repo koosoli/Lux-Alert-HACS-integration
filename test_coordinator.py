@@ -1,5 +1,5 @@
-"""Legacy manual coordinator smoke script retired.
+"""Retired manual coordinator smoke test.
 
-The real coordinator tests belong under tests/ and use pytest with a Home Assistant test instance.
-This file intentionally contains no executable network test so pytest collection cannot accidentally
-run an unmocked live-feed request.
+Coordinator tests should live in the pytest suite and mock external feed access.
+This legacy entry point is intentionally kept as a valid, non-executable module.
+"""
