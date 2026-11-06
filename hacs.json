@@ -1,15 +1,6 @@
 {
-  "domain": "lu-alert",
-  "name": "LU Alert",
-  "codeowners": [
-    "@janreimen", "@koosoli"
-  ],
-  "config_flow": true,
-  "dependencies": [],
-  "documentation": "https://github.com/janreimen/Lux-Alert-HACS-integration",
-  "iot_class": "cloud_polling",
-  "requirements": [],
-  "version": "0.1.0",
+  "name": "LU-Alert",
+  "render_readme": true,
   "country": "LU",
-  "homeassistant": "2026.11.0"
+  "homeassistant": "2024.12.0"
 }

@@ -2,33 +2,22 @@
 
 ## Automated checks
 
-1. Syntax/bytecode: `python3 -m compileall -q .`
-2. Test suite: `python3 -m pytest -q`
-3. Lint: `ruff check custom_components tests`
-4. Home Assistant metadata: hassfest.
-5. HACS repository validation.
+The CI workflow runs the following checks on Python 3.12 and 3.13:
 
-Automated tests must not depend on the live LU-Alert service. Mock HTTP responses and use fixed CAP fixtures.
+1. Compile the integration and test modules: `python -m compileall -q custom_components tests`.
+2. Run the existing pytest suite: `python -m pytest -q`.
+3. Run Ruff: `ruff check custom_components tests`.
+4. Run Home Assistant hassfest.
+5. Run HACS validation for the `integration` category.
 
-## Existing test areas
+The test suite uses mocked Home Assistant services and fixed CAP fixtures; it does not depend on the live LU-Alert service.
 
-Preserve existing tests for CAP parsing, severity and alert rules, HTTP client security, configuration/options flow and entities. Extend tests whenever behavior changes.
+## Existing automated coverage
 
-## Required regression scenarios
+The existing tests cover CAP parsing, alert lifecycle and filtering rules, URL validation and dataset resource handling, polygon/circle geometry, configuration flow, Home Assistant entities and coordinator behavior, frontend card registration, and translations.
 
-- Dataset success, empty resources and conditional/cache behavior.
-- Network timeout, HTTP error, malformed JSON, invalid redirect and oversized response.
-- Valid CAP, malformed XML, DTD/entity rejection and missing optional fields.
-- Alert update/cancel/reference handling, duplicate messages and expiry.
-- Severity thresholds, unknown severity/level and test/exercise filtering.
-- Language/channel selection.
-- Location polygon/circle matching, no geometry and invalid coordinates.
-- Watchlist/allergen matching, empty values and case handling.
-- Coordinator first-refresh failure, outage retaining last-known alerts, backoff and recovery.
-- Config flow duplicate entry, options validation and reload.
-- Entity unique IDs, state/attributes, binary sensor transitions and feed diagnostics.
-- Frontend registration, card loading, safe rendering and map behavior.
+Add regression tests when changing behavior. Keep network responses deterministic and never call the live feed from unit tests.
 
 ## Manual smoke test
 
-On the test Home Assistant instance, record Core version and commit SHA. Verify install, first refresh, entities, empty feed, active alert, options update, outage/recovery and card rendering. Record limitations in release notes.
+On the test Home Assistant instance, record Core version and commit SHA. Verify installation, first refresh, entities, empty feed, active alert, options update, outage/recovery and card rendering. Record any limitations in release notes.

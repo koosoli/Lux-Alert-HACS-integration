@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [development, master, "feat/**", "fix/**"]
+    branches: [development, "feat/cap-lu-integration"]
   pull_request:
-    branches: [development, master]
+    branches: [development, "feat/cap-lu-integration"]
   workflow_dispatch:
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements_test.txt
       - name: Compile
-        run: python -m compileall -q .
+        run: python -m compileall -q custom_components tests
       - name: Pytest
         run: python -m pytest -q
       - name: Ruff

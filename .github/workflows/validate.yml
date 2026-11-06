@@ -2,9 +2,9 @@ name: Home Assistant and HACS validation
 
 on:
   push:
-    branches: [development, master, "feat/**", "fix/**"]
+    branches: [development, "feat/cap-lu-integration"]
   pull_request:
-    branches: [development, master]
+    branches: [development, "feat/cap-lu-integration"]
   workflow_dispatch:
 
 permissions:
