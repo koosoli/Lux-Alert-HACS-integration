@@ -1,0 +1,4 @@
+# Start with correctness-oriented rules for the existing integration.
+# Expand this set as the codebase is cleaned up and the baseline is stable.
+[lint]
+select = ["E4", "E7", "E9", "F821", "F822", "F823"]
