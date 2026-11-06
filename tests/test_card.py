@@ -1,9 +1,6 @@
 """The dashboard card is served by the integration and registered as an extra module of the frontend."""
 from pathlib import Path
 
-import aiohttp
-from aiohttp.test_utils import TestClient, TestServer
-import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
@@ -14,44 +11,20 @@ from helpers import alert, mock_feed, setup_entry
 WWW = Path(__file__).parent.parent / "custom_components" / DOMAIN / "www"
 
 
-@pytest.fixture
-async def integration_http_session(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, monkeypatch):
-    """Use a test-owned session for the coordinator, avoiding the optional pycares resolver thread."""
-    connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
-    session = aiohttp.ClientSession(connector=connector)
-    object.__setattr__(session, "_request", aioclient_mock.match_request)
-    monkeypatch.setattr(
-        "custom_components.lu_alert.coordinator.async_get_clientsession",
-        lambda _hass: session,
-    )
-    try:
-        yield session
-    finally:
-        await session.close()
-
-
-async def test_the_card_and_leaflet_are_served(
-        hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, integration_http_session):
+async def test_the_card_and_leaflet_are_served(hass: HomeAssistant, hass_client, aioclient_mock: AiohttpClientMocker):
     mock_feed(aioclient_mock, [alert("a")])
     assert await async_setup_component(hass, "http", {})
     await setup_entry(hass)
-    # hass_client creates its own default ClientSession, which can start the optional pycares thread.
-    # Give the HTTP test client the same deterministic resolver as the integration session.
-    connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
-    client = TestClient(TestServer(hass.http.app), connector=connector)
-    await client.start_server()
-    try:
-        for name in (CARD_FILE, "leaflet.js", "leaflet.css"):
-            response = await client.get(f"{STATIC_URL}/{name}")
-            assert response.status == 200, name
-            assert await response.read() == (WWW / name).read_bytes()
-        assert (await client.get(f"{STATIC_URL}/lu-alert-card.js")).content_type in ("text/javascript", "application/javascript")
-    finally:
-        await client.close()
+    client = await hass_client()
+
+    for name in (CARD_FILE, "leaflet.js", "leaflet.css"):
+        response = await client.get(f"{STATIC_URL}/{name}")
+        assert response.status == 200, name
+        assert await response.read() == (WWW / name).read_bytes()
+    assert (await client.get(f"{STATIC_URL}/lu-alert-card.js")).content_type in ("text/javascript", "application/javascript")
 
 
-async def test_the_card_module_is_loaded_by_the_frontend(
-        hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, integration_http_session):
+async def test_the_card_module_is_loaded_by_the_frontend(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
     from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL, UrlManager
 
     # The real frontend needs the hass_frontend package (50 MB) that the test plugin does not install: what matters
@@ -65,8 +38,7 @@ async def test_the_card_module_is_loaded_by_the_frontend(
     assert any(u.startswith(f"{STATIC_URL}/{CARD_FILE}?v=0.1.0") for u in urls), urls
 
 
-async def test_without_a_frontend_the_set_up_still_works(
-        hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, integration_http_session):
+async def test_without_a_frontend_the_set_up_still_works(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
     mock_feed(aioclient_mock, [alert("a")])
     entry = await setup_entry(hass)
     assert hass.states.get("sensor.lu_alert").state == "1"

@@ -1,7 +1,6 @@
 """The blueprints load with Home Assistant's own blueprint schema, point at entities that exist, and render."""
 from pathlib import Path
 
-import aiohttp
 import pytest
 from homeassistant.components.blueprint import models
 from homeassistant.components.blueprint.schemas import BLUEPRINT_SCHEMA
@@ -15,24 +14,6 @@ from helpers import alert, mock_feed, setup_entry
 
 FOLDER = Path(__file__).parent.parent / "custom_components" / DOMAIN / "blueprints"
 FILES = sorted(FOLDER.glob("*.yaml"))
-
-
-@pytest.fixture
-async def integration_http_session(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, monkeypatch):
-    """Keep blueprint setup tests independent of the optional pycares resolver thread."""
-    connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
-    session = aiohttp.ClientSession(connector=connector)
-    # Use the same request interceptor as the HA test mocker, but with a
-    # test-owned session whose resolver has no background pycares thread.
-    object.__setattr__(session, "_request", aioclient_mock.match_request)
-    monkeypatch.setattr(
-        "custom_components.lu_alert.coordinator.async_get_clientsession",
-        lambda _hass: session,
-    )
-    try:
-        yield session
-    finally:
-        await session.close()
 
 
 def test_there_are_three_blueprints():
@@ -50,7 +31,7 @@ def test_the_blueprint_is_valid(path):
 
 @pytest.mark.parametrize("path", FILES, ids=lambda p: p.stem)
 async def test_the_blueprint_uses_entities_the_integration_creates(
-        hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, integration_http_session, path):
+        hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, path):
     mock_feed(aioclient_mock, [alert("a", description="peanuts", headline="Recall")])
     await setup_entry(hass, options={"allergens": ["peanuts"], "location_mode": "flag", "latitude": 49.6,
                                      "longitude": 6.1})
@@ -60,8 +41,7 @@ async def test_the_blueprint_uses_entities_the_integration_creates(
     assert trigger["trigger"] == "state" and trigger["to"] == "on"
 
 
-async def test_the_critical_blueprint_text_and_data_render(
-        hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, integration_http_session):
+async def test_the_critical_blueprint_text_and_data_render(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
     mock_feed(aioclient_mock, [alert("a", headline="Storm", event="Wind")])
     await setup_entry(hass)
     action = yaml_util.load_yaml(FOLDER / "critical_alert_notification.yaml")["actions"][1]
@@ -74,8 +54,7 @@ async def test_the_critical_blueprint_text_and_data_render(
         "channel": "Alerts", "priority": "high"}
 
 
-async def test_the_list_blueprints_pick_the_right_alerts(
-        hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, integration_http_session):
+async def test_the_list_blueprints_pick_the_right_alerts(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker):
     mock_feed(aioclient_mock, [alert("a", description="contains peanuts", headline="Recall"),
                                alert("b", description="storm", headline="Storm")])
     await setup_entry(hass, options={"allergens": ["peanuts"]})

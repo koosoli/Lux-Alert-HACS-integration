@@ -2,6 +2,15 @@
 import os
 import time
 
+import aiohttp
+import aiohttp.connector
+
+# Home Assistant's test dependencies install aiodns. aiohttp then selects its
+# pycares-based AsyncResolver by default, which starts a background shutdown
+# thread. Use aiohttp's standard threaded resolver for every test-created
+# connector/session, including those created inside Home Assistant fixtures.
+aiohttp.connector.DefaultResolver = aiohttp.ThreadedResolver
+
 # Alert end times are shown in the time zone of the machine: tests run in UTC.
 os.environ["TZ"] = "UTC"
 if hasattr(time, "tzset"):
