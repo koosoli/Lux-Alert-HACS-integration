@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import aiohttp
+from aiohttp.test_utils import TestClient, TestServer
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
@@ -30,17 +31,23 @@ async def integration_http_session(hass: HomeAssistant, aioclient_mock: AiohttpC
 
 
 async def test_the_card_and_leaflet_are_served(
-        hass: HomeAssistant, hass_client, aioclient_mock: AiohttpClientMocker, integration_http_session):
+        hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, integration_http_session):
     mock_feed(aioclient_mock, [alert("a")])
     assert await async_setup_component(hass, "http", {})
     await setup_entry(hass)
-    client = await hass_client()
-
-    for name in (CARD_FILE, "leaflet.js", "leaflet.css"):
-        response = await client.get(f"{STATIC_URL}/{name}")
-        assert response.status == 200, name
-        assert await response.read() == (WWW / name).read_bytes()
-    assert (await client.get(f"{STATIC_URL}/lu-alert-card.js")).content_type in ("text/javascript", "application/javascript")
+    # hass_client creates its own default ClientSession, which can start the optional pycares thread.
+    # Give the HTTP test client the same deterministic resolver as the integration session.
+    connector = aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver())
+    client = TestClient(TestServer(hass.http.app), connector=connector)
+    await client.start_server()
+    try:
+        for name in (CARD_FILE, "leaflet.js", "leaflet.css"):
+            response = await client.get(f"{STATIC_URL}/{name}")
+            assert response.status == 200, name
+            assert await response.read() == (WWW / name).read_bytes()
+        assert (await client.get(f"{STATIC_URL}/lu-alert-card.js")).content_type in ("text/javascript", "application/javascript")
+    finally:
+        await client.close()
 
 
 async def test_the_card_module_is_loaded_by_the_frontend(
